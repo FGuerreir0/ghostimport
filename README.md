@@ -85,6 +85,66 @@ ghostimport --help
 
 This step will fail (exit code 1) if any hallucinated packages are found.
 
+### Badge
+
+Show a ![ghost imports](https://img.shields.io/badge/ghost_imports-clean-brightgreen) badge on your README.
+
+**1. Create a Gist**
+
+Go to [gist.github.com](https://gist.github.com) and create a **public** gist with a file named `ghostimport-badge.json` (content can be `{}`). Copy the Gist ID from the URL.
+
+**2. Add secrets to your repo**
+
+In your repo → Settings → Secrets and variables → Actions:
+- Add a **secret** `GIST_SECRET` — a [Personal Access Token](https://github.com/settings/tokens) with `gist` scope
+- Add a **variable** `BADGE_GIST_ID` — the Gist ID from step 1
+
+**3. Add the workflow**
+
+Create `.github/workflows/ghostimport-badge.yml`:
+
+```yaml
+name: Ghost Import Badge
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Run ghostimport
+        id: scan
+        run: |
+          npx ghostimport --badge --quiet || true
+          echo "label=$(jq -r .label ghostimport-badge.json)" >> $GITHUB_OUTPUT
+          echo "message=$(jq -r .message ghostimport-badge.json)" >> $GITHUB_OUTPUT
+          echo "color=$(jq -r .color ghostimport-badge.json)" >> $GITHUB_OUTPUT
+      - name: Update badge
+        uses: schneegans/dynamic-badges-action@v1.8.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: ghostimport-badge.json
+          label: ${{ steps.scan.outputs.label }}
+          message: ${{ steps.scan.outputs.message }}
+          color: ${{ steps.scan.outputs.color }}
+```
+
+**4. Add the badge to your README**
+
+```md
+![ghost imports](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/<USER>/<GIST_ID>/raw/ghostimport-badge.json)
+```
+
+Replace `<USER>` with your GitHub username and `<GIST_ID>` with the Gist ID.
+
 ---
 
 ## Programmatic API
