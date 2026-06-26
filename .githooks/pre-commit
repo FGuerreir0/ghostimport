@@ -8,7 +8,7 @@ if [ -z "$STAGED" ]; then
 fi
 
 # Bump patch version without creating a git tag
-npm version patch --no-git-tag-version > /dev/null 2>&1
+npm version patch --no-git-tag-version --force > /dev/null 2>&1
 
 # Stage the updated package.json and package-lock.json
 git add package.json package-lock.json

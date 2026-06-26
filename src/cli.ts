@@ -223,3 +223,4 @@ if (flags.watch) {
 } else {
   process.exit(issues > 0 ? 1 : 0)
 }
+
