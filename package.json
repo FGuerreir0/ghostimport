@@ -1,6 +1,6 @@
 {
   "name": "ghostimport",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Detects ghost imports in your code - imports that don't exist, hallucinated by AI coding tools.",
   "keywords": [
     "npm",
