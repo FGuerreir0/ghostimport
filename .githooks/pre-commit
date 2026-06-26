@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Only bump version if source files are staged
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(src/|tests/|build\.js)')
+
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+
+# Bump patch version without creating a git tag
+npm version patch --no-git-tag-version > /dev/null 2>&1
+
+# Stage the updated package.json and package-lock.json
+git add package.json package-lock.json

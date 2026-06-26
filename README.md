@@ -40,6 +40,8 @@ The result: your build fails, or your CI breaks at 2am, or — in the worst case
 
 ## Install
 
+Requires Node.js 22 or later.
+
 ```bash
 # Run once (no install needed)
 npx ghostimport
@@ -163,6 +165,9 @@ interface ScanOptions {
 **Automatically ignores:**
 - Node.js built-ins (`fs`, `path`, `crypto`, `node:*`, ...)
 - Relative imports (`./`, `../`)
+- Path aliases (`@/`, `~/`, `$lib/`, and tsconfig `paths`)
+- URL/protocol imports (`https:`, `data:`, `bun:`, ...)
+- Virtual modules (`virtual:`, Vite/Rollup internals)
 - `node_modules/`, `dist/`, `.git/`, `build/`
 
 **Supported file types:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs`

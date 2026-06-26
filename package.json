@@ -50,6 +50,7 @@
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "test": "tsx tests/test.ts",
     "dev": "tsx src/cli.ts",
+    "prepare": "git config core.hooksPath .githooks",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
