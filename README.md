@@ -73,11 +73,26 @@ ghostimport --json
 # Skip "missing from package.json" warnings
 ghostimport --no-undeclared
 
+# Watch mode (re-scans on file changes)
+ghostimport --watch
+
 # Help
 ghostimport --help
 ```
 
 ### Add to CI (GitHub Actions)
+
+Use the built-in action for the simplest setup:
+
+```yaml
+- name: Check for hallucinated packages
+  uses: FGuerreir0/ghostimport@main
+  with:
+    path: '.'
+    scary: 'false'
+```
+
+Or run directly:
 
 ```yaml
 - name: Check for hallucinated packages
@@ -85,6 +100,18 @@ ghostimport --help
 ```
 
 This step will fail (exit code 1) if any hallucinated packages are found.
+
+### Pre-commit
+
+Add to `.pre-commit-config.yaml`:
+
+```yaml
+repos:
+  - repo: https://github.com/FGuerreir0/ghostimport
+    rev: main
+    hooks:
+      - id: ghostimport
+```
 
 ---
 

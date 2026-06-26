@@ -1,0 +1,8 @@
+- id: ghostimport
+  name: ghostimport
+  description: Detect hallucinated npm imports
+  entry: npx ghostimport --quiet
+  language: node
+  always_run: true
+  pass_filenames: false
+  stages: [pre-commit, pre-push]

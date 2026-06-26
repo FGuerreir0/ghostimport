@@ -12,7 +12,13 @@
     "imports",
     "security",
     "lint",
-    "ghost"
+    "ghost",
+    "import-validation",
+    "ai-safety",
+    "supply-chain",
+    "hallucination-detection",
+    "copilot",
+    "pre-commit"
   ],
   "homepage": "https://github.com/FGuerreir0/ghostimport#readme",
   "bugs": {

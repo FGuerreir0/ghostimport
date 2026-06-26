@@ -1,5 +1,5 @@
 import path from 'path'
-import { readFileSync } from 'fs'
+import { readFileSync, watch as fsWatch, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { scan } from './scan'
 import { loadConfig } from './config'
@@ -29,6 +29,7 @@ const targetDir = path.resolve(args.find(a => !a.startsWith('--') && !a.startsWi
 const flags = {
   quiet:        args.includes('--quiet') || args.includes('-q'),
   json:         args.includes('--json'),
+  watch:        args.includes('--watch') || args.includes('-w'),
   noUndeclared: args.includes('--no-undeclared'),
   noCache:      args.includes('--no-cache'),
   scary:        args.includes('--scary'),
@@ -51,6 +52,7 @@ ${c.bold('Usage:')}
 ${c.bold('Options:')}
   --quiet, -q       Only show problems (no progress)
   --json            Output results as JSON
+  --watch, -w       Watch for file changes and re-scan
   --no-undeclared   Skip "imported but not in package.json" warnings
   --scary           Check for supply chain attack risk (squatting)
   --no-cache        Skip the local registry cache
@@ -78,16 +80,17 @@ ${c.bold('Examples:')}
 
 const config = loadConfig(targetDir)
 
-if (!flags.quiet && !flags.json) {
-  console.log(`\n${c.bold('ghostimport')} ${c.gray(`v${version}`)}`)
-  console.log(c.gray(`Scanning ${targetDir}`))
-  if (flags.scary) console.log(c.magenta('  ⚠  Scary mode: checking supply chain risk'))
-  console.log()
-}
+async function runScan() {
+  if (!flags.quiet && !flags.json) {
+    console.log(`\n${c.bold('ghostimport')} ${c.gray(`v${version}`)}`)
+    console.log(c.gray(`Scanning ${targetDir}`))
+    if (flags.scary) console.log(c.magenta('  ⚠  Scary mode: checking supply chain risk'))
+    console.log()
+  }
 
-let lastProgress = ''
+  let lastProgress = ''
 
-const results = await scan(targetDir, {
+  const results = await scan(targetDir, {
   useCache: !flags.noCache,
   scary: flags.scary,
   config,
@@ -100,95 +103,123 @@ const results = await scan(targetDir, {
   },
 })
 
-if (!flags.json && !flags.quiet && lastProgress) {
-  process.stdout.write('\r' + ' '.repeat(lastProgress.length + 5) + '\r')
-}
-
-// ─── JSON output ──────────────────────────────────────────────────────────────
-
-if (flags.json) {
-  console.log(JSON.stringify(results, null, 2))
-  process.exit(results.hallucinated.length > 0 ? 1 : 0)
-}
-
-// ─── Human output ─────────────────────────────────────────────────────────────
-
-const totalIssues = results.hallucinated.length +
-  (flags.noUndeclared ? 0 : results.notInPackageJson.length)
-
-console.log(
-  `  ${c.gray('Scanned')} ${c.cyan(results.scanned + ' files')}` +
-  ` · ${c.cyan(results.packages + ' unique packages')} checked` +
-  (results.cacheHits > 0 ? ` ${c.gray(`(${results.cacheHits} cached)`)}` : '') +
-  '\n',
-)
-
-// ── Hallucinated packages ────────────────────────────────────────────────────
-if (results.hallucinated.length === 0) {
-  console.log(c.green('  ✓ No hallucinated packages found'))
-} else {
-  console.log(c.bold(c.red(`  ✗ ${results.hallucinated.length} hallucinated package${results.hallucinated.length > 1 ? 's' : ''} (do not exist on npm):\n`)))
-  for (const { pkg, files } of results.hallucinated) {
-    console.log(`  ${c.red('●')} ${c.bold(pkg)}`)
-    for (const f of files.slice(0, 3)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
-    if (files.length > 3) console.log(`    ${c.gray(`↳ ...and ${files.length - 3} more files`)}`)
+  if (!flags.json && !flags.quiet && lastProgress) {
+    process.stdout.write('\r' + ' '.repeat(lastProgress.length + 5) + '\r')
   }
-}
 
-// ── Scary mode output ────────────────────────────────────────────────────────
-if (flags.scary && results.scary.length > 0) {
-  console.log()
-  const available = results.scary.filter(s => s.type === 'available')
-  const suspicious = results.scary.filter(s => s.type === 'suspicious')
+  // ─── JSON output ──────────────────────────────────────────────────────────────
 
-  if (available.length > 0) {
-    console.log(c.bold(c.magenta(`  💀 ${available.length} package name${available.length > 1 ? 's' : ''} available for malicious registration:\n`)))
-    for (const { pkg } of available) {
-      console.log(`  ${c.magenta('●')} ${c.bold(pkg)}`)
-      console.log(`    ${c.red('↳ Anyone can register this name with a malicious postinstall script')}`)
-      console.log(`    ${c.red('↳ If installed, it could exfiltrate .env, tokens, SSH keys')}`)
+  if (flags.json) {
+    console.log(JSON.stringify(results, null, 2))
+    return results.hallucinated.length
+  }
+
+  // ─── Human output ────────────────────────────────────────────────────────────
+
+  const totalIssues = results.hallucinated.length +
+    (flags.noUndeclared ? 0 : results.notInPackageJson.length)
+
+  console.log(
+    `  ${c.gray('Scanned')} ${c.cyan(results.scanned + ' files')}` +
+    ` · ${c.cyan(results.packages + ' unique packages')} checked` +
+    (results.cacheHits > 0 ? ` ${c.gray(`(${results.cacheHits} cached)`)}` : '') +
+    '\n',
+  )
+
+  // ── Hallucinated packages ────────────────────────────────────────────────────
+  if (results.hallucinated.length === 0) {
+    console.log(c.green('  ✓ No hallucinated packages found'))
+  } else {
+    console.log(c.bold(c.red(`  ✗ ${results.hallucinated.length} hallucinated package${results.hallucinated.length > 1 ? 's' : ''} (do not exist on npm):\n`)))
+    for (const { pkg, files } of results.hallucinated) {
+      console.log(`  ${c.red('●')} ${c.bold(pkg)}`)
+      for (const f of files.slice(0, 3)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
+      if (files.length > 3) console.log(`    ${c.gray(`↳ ...and ${files.length - 3} more files`)}`)
     }
   }
 
-  if (suspicious.length > 0) {
+  // ── Scary mode output ────────────────────────────────────────────────────────
+  if (flags.scary && results.scary.length > 0) {
     console.log()
-    console.log(c.bold(c.magenta(`  🕵️  ${suspicious.length} suspicious package${suspicious.length > 1 ? 's' : ''} (potential squats):\n`)))
-    for (const entry of suspicious) {
-      if (entry.type !== 'suspicious') continue
-      console.log(`  ${c.magenta('●')} ${c.bold(entry.pkg)} ${c.gray(`(created ${entry.created}, ${entry.downloads ?? '?'} downloads/week)`)}`)
-      for (const flag of entry.flags) console.log(`    ${c.yellow('↳')} ${flag}`)
+    const available = results.scary.filter(s => s.type === 'available')
+    const suspicious = results.scary.filter(s => s.type === 'suspicious')
+
+    if (available.length > 0) {
+      console.log(c.bold(c.magenta(`  💀 ${available.length} package name${available.length > 1 ? 's' : ''} available for malicious registration:\n`)))
+      for (const { pkg } of available) {
+        console.log(`  ${c.magenta('●')} ${c.bold(pkg)}`)
+        console.log(`    ${c.red('↳ Anyone can register this name with a malicious postinstall script')}`)
+        console.log(`    ${c.red('↳ If installed, it could exfiltrate .env, tokens, SSH keys')}`)
+      }
+    }
+
+    if (suspicious.length > 0) {
+      console.log()
+      console.log(c.bold(c.magenta(`  🕵️  ${suspicious.length} suspicious package${suspicious.length > 1 ? 's' : ''} (potential squats):\n`)))
+      for (const entry of suspicious) {
+        if (entry.type !== 'suspicious') continue
+        console.log(`  ${c.magenta('●')} ${c.bold(entry.pkg)} ${c.gray(`(created ${entry.created}, ${entry.downloads ?? '?'} downloads/week)`)}`)
+        for (const flag of entry.flags) console.log(`    ${c.yellow('↳')} ${flag}`)
+      }
     }
   }
-}
 
-// ── Not in package.json ──────────────────────────────────────────────────────
-if (!flags.noUndeclared && results.notInPackageJson.length > 0) {
-  console.log()
-  console.log(c.bold(c.yellow(`  ⚠  ${results.notInPackageJson.length} package${results.notInPackageJson.length > 1 ? 's' : ''} imported but missing from package.json:\n`)))
-  for (const { pkg, files } of results.notInPackageJson.slice(0, 10)) {
-    console.log(`  ${c.yellow('●')} ${c.bold(pkg)}`)
-    for (const f of files.slice(0, 2)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
+  // ── Not in package.json ──────────────────────────────────────────────────────
+  if (!flags.noUndeclared && results.notInPackageJson.length > 0) {
+    console.log()
+    console.log(c.bold(c.yellow(`  ⚠  ${results.notInPackageJson.length} package${results.notInPackageJson.length > 1 ? 's' : ''} imported but missing from package.json:\n`)))
+    for (const { pkg, files } of results.notInPackageJson.slice(0, 10)) {
+      console.log(`  ${c.yellow('●')} ${c.bold(pkg)}`)
+      for (const f of files.slice(0, 2)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
+    }
+    if (results.notInPackageJson.length > 10) {
+      console.log(`  ${c.gray(`  ...and ${results.notInPackageJson.length - 10} more`)}`)
+    }
   }
-  if (results.notInPackageJson.length > 10) {
-    console.log(`  ${c.gray(`  ...and ${results.notInPackageJson.length - 10} more`)}`)
+
+  // ── Errors ───────────────────────────────────────────────────────────────────
+  if (results.errors.length > 0) {
+    console.log()
+    console.log(c.gray(`  ⚡ ${results.errors.length} package(s) could not be checked (network/timeout)`))
   }
-}
 
-// ── Errors ───────────────────────────────────────────────────────────────────
-if (results.errors.length > 0) {
+  // ── Final verdict ─────────────────────────────────────────────────────────────
   console.log()
-  console.log(c.gray(`  ⚡ ${results.errors.length} package(s) could not be checked (network/timeout)`))
+  if (totalIssues === 0 && results.scary.length === 0) {
+    console.log(c.green(c.bold('  All good! ✓\n')))
+  } else if (flags.scary && results.scary.length > 0) {
+    const scaryCount = results.scary.filter(s => s.type === 'available').length
+    console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''} · ${scaryCount} supply chain risk${scaryCount > 1 ? 's' : ''}\n`)))
+  } else {
+    console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''}.\n`)))
+  }
+
+  return results.hallucinated.length
 }
 
-// ── Final verdict ─────────────────────────────────────────────────────────────
-console.log()
-if (totalIssues === 0 && results.scary.length === 0) {
-  console.log(c.green(c.bold('  All good! ✓\n')))
-} else if (flags.scary && results.scary.length > 0) {
-  const scaryCount = results.scary.filter(s => s.type === 'available').length
-  console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''} · ${scaryCount} supply chain risk${scaryCount > 1 ? 's' : ''}\n`)))
+// ─── Execute ──────────────────────────────────────────────────────────────────
+
+const issues = await runScan()
+
+if (flags.watch) {
+  const CODE_EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'])
+  let debounce: ReturnType<typeof setTimeout> | null = null
+
+  console.log(c.gray(`  Watching for changes in ${targetDir}...\n`))
+
+  fsWatch(targetDir, { recursive: true }, (_event, filename) => {
+    if (!filename) return
+    const ext = path.extname(filename)
+    if (!CODE_EXTS.has(ext)) return
+    if (filename.includes('node_modules') || filename.includes('dist')) return
+
+    if (debounce) clearTimeout(debounce)
+    debounce = setTimeout(async () => {
+      console.clear()
+      await runScan()
+      console.log(c.gray(`  Watching for changes...\n`))
+    }, 300)
+  })
 } else {
-  console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''}.\n`)))
+  process.exit(issues > 0 ? 1 : 0)
 }
-
-process.exit(results.hallucinated.length > 0 ? 1 : 0)
