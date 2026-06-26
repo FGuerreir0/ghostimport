@@ -1,5 +1,5 @@
 import path from 'path'
-import { readFileSync, writeFileSync } from 'fs'
+import { readFileSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { scan } from './scan'
 import { loadConfig } from './config'
@@ -29,7 +29,6 @@ const targetDir = path.resolve(args.find(a => !a.startsWith('--') && !a.startsWi
 const flags = {
   quiet:        args.includes('--quiet') || args.includes('-q'),
   json:         args.includes('--json'),
-  badge:        args.includes('--badge'),
   noUndeclared: args.includes('--no-undeclared'),
   noCache:      args.includes('--no-cache'),
   scary:        args.includes('--scary'),
@@ -52,7 +51,6 @@ ${c.bold('Usage:')}
 ${c.bold('Options:')}
   --quiet, -q       Only show problems (no progress)
   --json            Output results as JSON
-  --badge           Output shields.io badge JSON (for CI)
   --no-undeclared   Skip "imported but not in package.json" warnings
   --scary           Check for supply chain attack risk (squatting)
   --no-cache        Skip the local registry cache
@@ -104,27 +102,6 @@ const results = await scan(targetDir, {
 
 if (!flags.json && !flags.quiet && lastProgress) {
   process.stdout.write('\r' + ' '.repeat(lastProgress.length + 5) + '\r')
-}
-
-// ─── Badge output ─────────────────────────────────────────────────────────────
-
-if (flags.badge) {
-  const ghosts = results.hallucinated.length
-  const badge = {
-    schemaVersion: 1,
-    label: 'ghost imports',
-    message: ghosts === 0 ? 'clean' : `${ghosts} found`,
-    color: ghosts === 0 ? 'brightgreen' : 'red',
-    namedLogo: 'npm',
-  }
-  const badgePath = path.join(targetDir, 'ghostimport-badge.json')
-  writeFileSync(badgePath, JSON.stringify(badge, null, 2))
-  console.log(JSON.stringify(badge, null, 2))
-  if (!flags.quiet) {
-    console.error(`\nBadge JSON written to ${badgePath}`)
-    console.error(`Use with: https://img.shields.io/endpoint?url=<raw-url-to-badge-json>`)
-  }
-  process.exit(ghosts > 0 ? 1 : 0)
 }
 
 // ─── JSON output ──────────────────────────────────────────────────────────────
