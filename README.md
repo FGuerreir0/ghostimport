@@ -1,4 +1,4 @@
-![ghost imports](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FGuerreir0/ghostimport/main/ghostimport-badge.json)
+![ghost imports](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/FGuerreir0/BADGE_GIST_ID/raw/ghostimport-badge.json)
 ![CI](https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg)
 
 # ghostimport

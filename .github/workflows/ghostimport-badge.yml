@@ -3,16 +3,12 @@ name: Ghost Import Badge
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   schedule:
     - cron: '0 6 * * 1' # Weekly on Monday
 
 jobs:
   scan:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -25,30 +21,19 @@ jobs:
       - run: npm run build
 
       - name: Run ghostimport
-        run: node dist/cli.js --badge --quiet || true
-
-      - name: Upload badge JSON
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ghostimport-badge
-          path: ghostimport-badge.json
-
-      # Option A: Commit badge to repo
-      - name: Commit badge
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        id: scan
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add ghostimport-badge.json
-          git diff --cached --quiet || git commit -m "chore: update ghostimport badge [skip ci]"
-          git push
+          node dist/cli.js --badge --quiet || true
+          echo "label=$(jq -r .label ghostimport-badge.json)" >> $GITHUB_OUTPUT
+          echo "message=$(jq -r .message ghostimport-badge.json)" >> $GITHUB_OUTPUT
+          echo "color=$(jq -r .color ghostimport-badge.json)" >> $GITHUB_OUTPUT
 
-      # Option B (alternative): Update a Gist instead
-      # Uncomment and set GIST_ID secret if you prefer not committing to the repo
-      # - name: Update Gist
-      #   uses: exuanbo/actions-deploy-gist@v1
-      #   with:
-      #     token: ${{ secrets.GIST_TOKEN }}
-      #     gist_id: <your-gist-id>
-      #     file_path: ghostimport-badge.json
+      - name: Update badge gist
+        uses: schneegans/dynamic-badges-action@v1
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: ${{ vars.BADGE_GIST_ID }}
+          filename: ghostimport-badge.json
+          label: ${{ steps.scan.outputs.label }}
+          message: ${{ steps.scan.outputs.message }}
+          color: ${{ steps.scan.outputs.color }}
