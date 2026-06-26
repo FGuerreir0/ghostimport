@@ -36,7 +36,7 @@
     }
   },
   "bin": {
-    "ghostimport": "./dist/cli.js"
+    "ghostimport": "dist/cli.js"
   },
   "files": [
     "dist"
