@@ -1,8 +1,9 @@
 ![ghost imports](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/FGuerreir0/ghostimport/main/ghostimport-badge.json)
+![CI](https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg)
 
 # ghostimport
 
-**👻 Detects ghost imports — npm packages that don't exist, hallucinated by AI coding tools like Cursor, Copilot, and Claude**
+**Detects ghost imports — npm packages that don't exist, hallucinated by AI coding tools like Cursor, Copilot, and Claude**
 
 AI coding tools sometimes generate `import` statements for packages that don't exist on npm. `ghostimport` scans your codebase and flags them before they cause a build failure — or worse, before an attacker registers the name with a malicious payload.
 
@@ -88,7 +89,7 @@ This step will fail (exit code 1) if any hallucinated packages are found.
 
 ## Programmatic API
 
-```js
+```ts
 import { scan, extractImports, checkNpm } from 'ghostimport'
 
 // Scan a directory
@@ -112,9 +113,13 @@ const imports = extractImports(`
 // ['react', '@fake/pkg']
 ```
 
-### Result shape
+### TypeScript types
+
+The package ships with full TypeScript declarations. Key types:
 
 ```ts
+import type { ScanResult, ScanOptions, ScaryEntry, NpmCheckResult } from 'ghostimport'
+
 interface ScanResult {
   scanned: number          // total files scanned
   packages: number         // unique packages found
@@ -126,11 +131,20 @@ interface ScanResult {
     pkg: string
     files: string[]
   }[]
-  errors: {                // packages that couldn't be checked
+  errors: {                // packages that couldn't be checked (network)
     pkg: string
     error: string
     files: string[]
   }[]
+  scary: ScaryEntry[]      // supply chain risk entries (--scary mode)
+  cacheHits: number
+}
+
+interface ScanOptions {
+  onProgress?: (p: { pkg: string; exists: boolean | null; done: number; total: number }) => void
+  useCache?: boolean       // default: true
+  scary?: boolean          // default: false
+  config?: Config
 }
 ```
 
@@ -156,13 +170,69 @@ interface ScanResult {
 
 ---
 
+## Supply chain risk (`--scary`)
+
+```bash
+ghostimport --scary
+```
+
+In scary mode, `ghostimport` also checks whether hallucinated package names are available for malicious registration, and flags recently-published packages with suspicious signals (new, few downloads, single version).
+
+---
+
+## Config file
+
+Create `.ghostimportrc.json` in your project root:
+
+```json
+{
+  "ignore": ["@company/*", "internal-lib"],
+  "includeUndeclared": true
+}
+```
+
+| Field | Default | Description |
+|---|---|---|
+| `ignore` | `[]` | Packages or scope patterns to skip (`@scope/*` supported) |
+| `includeUndeclared` | `true` | Warn on packages that exist on npm but aren't in `package.json` |
+
+---
+
 ## Zero dependencies
 
-`ghostimport` has **no npm dependencies**. It uses only Node.js built-ins. This means:
+`ghostimport` has **no runtime dependencies**. The published package uses only Node.js built-ins. This means:
 
 - No supply chain risk from the tool itself
 - Fast install
 - Works offline for the scan phase (network only needed to check npm)
+
+---
+
+## Contributing
+
+```bash
+git clone https://github.com/FGuerreir0/ghostimport
+cd ghostimport
+npm install
+
+npm run build   # type-check + emit .d.ts + bundle with esbuild
+npm test        # run test suite
+npm run dev     # run CLI from source (no build needed)
+npm run typecheck  # type-check only (no output)
+```
+
+Source layout:
+
+| File | Purpose |
+|---|---|
+| `src/types.ts` | All exported TypeScript interfaces |
+| `src/imports.ts` | Import extraction (regex) |
+| `src/cache.ts` | Local registry cache (`~/.ghostimport/`) |
+| `src/config.ts` | `.ghostimportrc.json` loading |
+| `src/npm.ts` | npm registry checks, supply chain heuristics |
+| `src/files.ts` | File walker, `package.json` deps, monorepo support |
+| `src/scan.ts` | Main `scan()` orchestrator |
+| `src/cli.ts` | CLI interface |
 
 ---
 

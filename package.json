@@ -46,12 +46,16 @@
   },
   "scripts": {
     "build": "node build.js",
+    "typecheck": "tsc",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
-    "test": "node tests/test.js",
-    "dev": "node src/cli.js",
+    "test": "tsx tests/test.ts",
+    "dev": "tsx src/cli.ts",
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "esbuild": "^0.27.2"
+    "@types/node": "^20.19.39",
+    "esbuild": "^0.27.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

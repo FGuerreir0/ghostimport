@@ -28,9 +28,6 @@ Thumbs.db
 
 # Testing
 coverage/
-
-# Generated
-ghostimport-badge.json
 .nyc_output/
 
 # Misc

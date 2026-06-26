@@ -4,13 +4,13 @@ export interface Config {
 }
 
 export interface ScanOptions {
-  onProgress?: (progress: ProgressEvent) => void
+  onProgress?: (progress: ScanProgress) => void
   useCache?: boolean
   scary?: boolean
   config?: Config
 }
 
-export interface ProgressEvent {
+export interface ScanProgress {
   pkg: string
   exists: boolean | null
   error?: string
@@ -56,28 +56,19 @@ export interface NpmCheckResult {
   error?: string
 }
 
-export interface ScaryCheckResult {
-  exists: boolean | null
-  error?: string
-  squatRisk?: 'available'
-  created?: string
-  downloads?: number | null
-  versions?: number
-  risk?: 'low' | 'medium' | 'high'
-  flags?: string[]
-}
+export type ScaryCheckResult =
+  | {
+      exists: true
+      created: string
+      downloads: number | null
+      versions: number
+      risk: 'low' | 'medium' | 'high'
+      flags: string[]
+    }
+  | { exists: false; squatRisk: 'available' }
+  | { exists: null; error: string }
 
 export interface CacheEntry {
   exists: boolean
   ts: number
 }
-
-export function scan(targetDir: string, options?: ScanOptions): Promise<ScanResult>
-export function extractImports(code: string): string[]
-export function checkNpm(pkgName: string): Promise<NpmCheckResult>
-export function checkScary(pkgName: string): Promise<ScaryCheckResult>
-export function walkFiles(dir: string): string[]
-export function readPackageJsonDeps(dir: string): Set<string>
-export function loadConfig(dir: string): Config
-export function loadCache(): Record<string, CacheEntry>
-export function saveCache(cache: Record<string, CacheEntry>): void
