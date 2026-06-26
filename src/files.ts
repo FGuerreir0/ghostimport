@@ -95,3 +95,30 @@ export function readWorkspacePackages(dir: string): Set<string> {
 
   return names
 }
+
+export function readTsconfigPaths(dir: string): Set<string> {
+  const aliases = new Set<string>()
+  const candidates = ['tsconfig.json', 'tsconfig.app.json', 'jsconfig.json']
+
+  for (const name of candidates) {
+    const configPath = path.join(dir, name)
+    if (!fs.existsSync(configPath)) continue
+    try {
+      const raw = fs.readFileSync(configPath, 'utf8')
+      // Strip single-line comments for JSON parsing
+      const stripped = raw.replace(/\/\/.*$/gm, '')
+      const config = JSON.parse(stripped) as {
+        compilerOptions?: { paths?: Record<string, string[]> }
+      }
+      const paths = config.compilerOptions?.paths
+      if (!paths) continue
+      for (const key of Object.keys(paths)) {
+        // Extract the prefix before * or / (e.g. "@components/*" → "@components")
+        const prefix = key.replace(/\/\*$/, '').replace(/\*$/, '')
+        if (prefix) aliases.add(prefix)
+      }
+    } catch { /* skip */ }
+  }
+
+  return aliases
+}

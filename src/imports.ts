@@ -24,6 +24,18 @@ function isBuiltin(name: string): boolean {
 }
 
 function toPackageName(importPath: string): string | null {
+  // Path aliases: @/, ~/, #imports, $lib/ (SvelteKit)
+  if (importPath.startsWith('@/') || importPath.startsWith('~/') || importPath.startsWith('#') || importPath.startsWith('$')) {
+    return null
+  }
+  // URL/protocol imports
+  if (/^[a-z][a-z0-9+.-]*:/i.test(importPath)) {
+    return null
+  }
+  // Virtual modules (Vite/Rollup)
+  if (importPath.startsWith('\0') || importPath.startsWith('virtual:')) {
+    return null
+  }
   if (importPath.startsWith('@')) {
     const parts = importPath.split('/')
     if (parts.length < 2) return null

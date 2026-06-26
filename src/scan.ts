@@ -4,7 +4,7 @@ import { extractImports } from './imports'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
 import { checkNpm, checkScary } from './npm'
-import { walkFiles, readPackageJsonDeps, readWorkspacePackages } from './files'
+import { walkFiles, readPackageJsonDeps, readWorkspacePackages, readTsconfigPaths } from './files'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
 const CONCURRENCY = 10
@@ -17,6 +17,7 @@ export async function scan(
   const files = walkFiles(targetDir)
   const declaredDeps = readPackageJsonDeps(targetDir)
   const workspacePkgs = readWorkspacePackages(targetDir)
+  const tsconfigAliases = readTsconfigPaths(targetDir)
 
   const cache: Record<string, CacheEntry> = useCache ? loadCache() : {}
   let cacheHits = 0
@@ -33,7 +34,7 @@ export async function scan(
   }
 
   const allPkgs = [...importMap.keys()].filter(
-    pkg => !matchesIgnore(pkg, conf.ignore) && !workspacePkgs.has(pkg),
+    pkg => !matchesIgnore(pkg, conf.ignore) && !workspacePkgs.has(pkg) && !tsconfigAliases.has(pkg),
   )
 
   const results: ScanResult = {
