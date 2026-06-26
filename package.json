@@ -1,0 +1,57 @@
+{
+  "name": "ghostimport",
+  "version": "0.1.0",
+  "description": "Detects ghost imports in your code - imports that don't exist, hallucinated by AI coding tools.",
+  "keywords": [
+    "npm",
+    "ai",
+    "hallucination",
+    "vibe-coding",
+    "cursor",
+    "claude",
+    "imports",
+    "security",
+    "lint",
+    "ghost"
+  ],
+  "homepage": "https://github.com/FGuerreir0/ghostimport#readme",
+  "bugs": {
+    "url": "https://github.com/FGuerreir0/ghostimport/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/FGuerreir0/ghostimport.git"
+  },
+  "license": "MIT",
+  "author": "Fábio Guerreiro",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "ghostimport": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "test": "node tests/test.js",
+    "dev": "node src/cli.js",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2"
+  }
+}
