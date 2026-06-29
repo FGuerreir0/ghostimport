@@ -1,5 +1,5 @@
 ![CI](https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg)
-
+[![ghostimport](https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen)](https://github.com/FGuerreir0/ghostimport)
 # ghostimport
 
 **Detects ghost imports — npm packages that don't exist, hallucinated by AI coding tools like Cursor, Copilot, and Claude**
@@ -9,7 +9,7 @@ AI coding tools sometimes generate `import` statements for packages that don't e
 ```
 $ npx ghostimport
 
-  ghostimport v0.1.0
+  ghostimport v0.1.4
   Scanning /my-project
 
   Scanned 142 files · 38 unique packages checked
@@ -76,6 +76,15 @@ ghostimport --no-undeclared
 # Watch mode (re-scans on file changes)
 ghostimport --watch
 
+# Check supply chain attack risk (squatting)
+ghostimport --scary
+
+# Skip the local registry cache
+ghostimport --no-cache
+
+# Print a README badge after scan
+ghostimport --badge
+
 # Help
 ghostimport --help
 ```
@@ -86,7 +95,7 @@ Use the built-in action for the simplest setup:
 
 ```yaml
 - name: Check for hallucinated packages
-  uses: FGuerreir0/ghostimport@main
+  uses: FGuerreir0/ghostimport@v0.1.4
   with:
     path: '.'
     scary: 'false'
@@ -108,7 +117,7 @@ Add to `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/FGuerreir0/ghostimport
-    rev: main
+    rev: v0.1.4
     hooks:
       - id: ghostimport
 ```

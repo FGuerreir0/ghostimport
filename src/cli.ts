@@ -33,6 +33,7 @@ const flags = {
   noUndeclared: args.includes('--no-undeclared'),
   noCache:      args.includes('--no-cache'),
   scary:        args.includes('--scary'),
+  badge:        args.includes('--badge'),
   help:         args.includes('--help') || args.includes('-h'),
   version:      args.includes('--version') || args.includes('-v'),
 }
@@ -72,8 +73,19 @@ ${c.bold('Examples:')}
   ghostimport --quiet          only show issues
   ghostimport --scary          check supply chain risk
   ghostimport --json           machine-readable output
+  ghostimport --badge          print README badge after scan
 `)
   process.exit(0)
+}
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+function badgeMarkdown(hallucinated: number): string {
+  const clean = hallucinated === 0
+  const msg   = clean ? '%E2%9C%93%20clean' : `%F0%9F%91%BB%20${hallucinated}%20ghost${hallucinated > 1 ? 's' : ''}`
+  const color = clean ? 'brightgreen' : 'red'
+  const url   = `https://img.shields.io/badge/ghostimport-${msg}-${color}`
+  return `[![ghostimport](${url})](https://github.com/FGuerreir0/ghostimport)`
 }
 
 // ─── Run ──────────────────────────────────────────────────────────────────────
@@ -192,6 +204,14 @@ async function runScan() {
     console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''} · ${scaryCount} supply chain risk${scaryCount > 1 ? 's' : ''}\n`)))
   } else {
     console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''}.\n`)))
+  }
+
+  if (flags.badge) {
+    const badge = badgeMarkdown(results.hallucinated.length)
+    console.log(c.gray('  ─────────────────────────────────────────────────────────'))
+    console.log(c.bold('  README badge (paste into your README.md):\n'))
+    console.log(`  ${badge}`)
+    console.log(c.gray('  ─────────────────────────────────────────────────────────\n'))
   }
 
   return results.hallucinated.length
