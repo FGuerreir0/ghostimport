@@ -33,3 +33,5 @@ coverage/
 # Misc
 *.tgz
 .npmrc
+
+deploy.ps1
