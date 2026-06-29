@@ -57,7 +57,10 @@
     "test": "tsx tests/test.ts",
     "dev": "tsx src/cli.ts",
     "prepare": "git config core.hooksPath .githooks",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "release": "pwsh -File deploy.ps1",
+    "release:minor": "pwsh -File deploy.ps1 -Bump minor",
+    "release:major": "pwsh -File deploy.ps1 -Bump major"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",
