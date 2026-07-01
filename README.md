@@ -9,7 +9,7 @@ AI coding tools sometimes generate `import` statements for packages that don't e
 ```
 $ npx ghostimport
 
-  ghostimport v0.2.0
+  ghostimport v0.3.0
   Scanning /my-project
 
   Scanned 142 files · 38 unique packages checked
@@ -95,7 +95,7 @@ Use the built-in action for the simplest setup:
 
 ```yaml
 - name: Check for hallucinated packages
-  uses: FGuerreir0/ghostimport@v0.2.0
+  uses: FGuerreir0/ghostimport@v0.3.0
   with:
     path: '.'
     scary: 'false'
@@ -117,7 +117,7 @@ Add to `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/FGuerreir0/ghostimport
-    rev: v0.2.0
+    rev: v0.3.0
     hooks:
       - id: ghostimport
 ```
