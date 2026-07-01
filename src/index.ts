@@ -1,7 +1,7 @@
 export { extractImports } from './imports'
 export { loadCache, saveCache } from './cache'
 export { loadConfig } from './config'
-export { checkNpm, checkScary } from './npm'
+export { checkNpm, checkScary, detectTyposquat } from './npm'
 export { walkFiles, readPackageJsonDeps } from './files'
 export { scan } from './scan'
 export type {
@@ -16,3 +16,4 @@ export type {
   ScaryCheckResult,
   CacheEntry,
 } from './types'
+

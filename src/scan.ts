@@ -3,7 +3,7 @@ import path from 'path'
 import { extractImports } from './imports'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
-import { checkNpm, checkScary } from './npm'
+import { checkNpm, checkScary, detectTyposquat } from './npm'
 import { walkFiles, readPackageJsonDeps, readWorkspacePackages, readTsconfigPaths } from './files'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
@@ -89,7 +89,7 @@ export async function scan(
   // and deep-check undeclared packages for supply chain risk heuristics
   if (scary) {
     for (const { pkg, files: matchedFiles } of results.hallucinated) {
-      results.scary.push({ pkg, files: matchedFiles, type: 'available' })
+      results.scary.push({ pkg, files: matchedFiles, type: 'available', typosquatOf: detectTyposquat(pkg) })
     }
 
     for (const { pkg, files: matchedFiles } of results.notInPackageJson) {
@@ -105,6 +105,9 @@ export async function scan(
           versions: info.versions,
           risk: info.risk as 'medium' | 'high',
           flags: info.flags,
+          installScripts: info.installScripts,
+          typosquatOf: info.typosquatOf,
+          maintainers: info.maintainers,
         })
       }
     }

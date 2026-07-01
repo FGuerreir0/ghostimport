@@ -158,8 +158,11 @@ async function runScan() {
 
     if (available.length > 0) {
       console.log(c.bold(c.magenta(`  💀 ${available.length} package name${available.length > 1 ? 's' : ''} available for malicious registration:\n`)))
-      for (const { pkg } of available) {
-        console.log(`  ${c.magenta('●')} ${c.bold(pkg)}`)
+      for (const entry of available) {
+        console.log(`  ${c.magenta('●')} ${c.bold(entry.pkg)}`)
+        if (entry.typosquatOf) {
+          console.log(`    ${c.red(`↳ TYPOSQUAT: 1-2 chars away from '${entry.typosquatOf}' — classic squatting pattern`)}`)
+        }
         console.log(`    ${c.red('↳ Anyone can register this name with a malicious postinstall script')}`)
         console.log(`    ${c.red('↳ If installed, it could exfiltrate .env, tokens, SSH keys')}`)
       }
@@ -170,8 +173,22 @@ async function runScan() {
       console.log(c.bold(c.magenta(`  🕵️  ${suspicious.length} suspicious package${suspicious.length > 1 ? 's' : ''} (potential squats):\n`)))
       for (const entry of suspicious) {
         if (entry.type !== 'suspicious') continue
-        console.log(`  ${c.magenta('●')} ${c.bold(entry.pkg)} ${c.gray(`(created ${entry.created}, ${entry.downloads ?? '?'} downloads/week)`)}`)
-        for (const flag of entry.flags) console.log(`    ${c.yellow('↳')} ${flag}`)
+        const riskColor = entry.risk === 'high' ? c.red : c.yellow
+        console.log(`  ${riskColor('●')} ${c.bold(entry.pkg)} ${c.gray(`[${entry.risk} risk]`)}`)
+        if (entry.installScripts.length > 0) {
+          console.log(`    ${c.red(`↳ CRITICAL: has ${entry.installScripts.join(', ')} hook — executes code on npm install`)}`)
+        }
+        if (entry.typosquatOf) {
+          console.log(`    ${c.red(`↳ TYPOSQUAT: 1-2 chars away from '${entry.typosquatOf}'`)}`)
+        }
+        if (entry.maintainers === 1) {
+          console.log(`    ${c.yellow('↳ single maintainer')}`)
+        }
+        const otherFlags = entry.flags.filter(f =>
+          !f.startsWith('has ') && !f.startsWith('name is') && f !== 'single maintainer'
+        )
+        for (const flag of otherFlags) console.log(`    ${c.yellow('↳')} ${flag}`)
+        console.log(c.gray(`    created ${entry.created} · ${entry.downloads ?? '?'} downloads/week · ${entry.versions} version${entry.versions !== 1 ? 's' : ''}`))
       }
     }
   }

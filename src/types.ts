@@ -28,7 +28,7 @@ export interface PackageError extends PackageRef {
 }
 
 export type ScaryEntry =
-  | { pkg: string; files: string[]; type: 'available' }
+  | { pkg: string; files: string[]; type: 'available'; typosquatOf: string | null }
   | {
       pkg: string
       files: string[]
@@ -39,6 +39,9 @@ export type ScaryEntry =
       versions: number
       risk: 'medium' | 'high'
       flags: string[]
+      installScripts: string[]
+      typosquatOf: string | null
+      maintainers: number
     }
 
 export interface ScanResult {
@@ -64,6 +67,9 @@ export type ScaryCheckResult =
       versions: number
       risk: 'low' | 'medium' | 'high'
       flags: string[]
+      installScripts: string[]
+      typosquatOf: string | null
+      maintainers: number
     }
   | { exists: false; squatRisk: 'available' }
   | { exists: null; error: string }

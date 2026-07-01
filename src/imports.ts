@@ -1,8 +1,9 @@
+// Capture group uses [^'"\r\n] to prevent cross-line matches on CRLF files
 const IMPORT_PATTERNS: RegExp[] = [
-  /import\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\n][^'"]*)['"]/g,
-  /require\s*\(\s*['"]([^'".\n][^'"]*)['"]\s*\)/g,
-  /import\s*\(\s*['"]([^'".\n][^'"]*)['"]\s*\)/g,
-  /export\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\n][^'"]*)['"]/g,
+  /import\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
+  /require\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
+  /import\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
+  /export\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
 ]
 
 const BUILTIN_MODULES = new Set([
@@ -17,6 +18,13 @@ const BUILTIN_MODULES = new Set([
   'tls', 'trace_events', 'tty', 'url', 'util', 'util/types', 'v8', 'vm',
   'wasi', 'worker_threads', 'zlib',
 ])
+
+// Valid npm package name segment: letters, digits, hyphens, underscores, dots
+const VALID_PKG_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/
+
+function isValidNpmName(name: string): boolean {
+  return VALID_PKG_NAME.test(name)
+}
 
 function isBuiltin(name: string): boolean {
   if (name.startsWith('node:')) return true
@@ -39,9 +47,13 @@ function toPackageName(importPath: string): string | null {
   if (importPath.startsWith('@')) {
     const parts = importPath.split('/')
     if (parts.length < 2) return null
+    const scope = parts[0].slice(1)
+    const name = parts[1]
+    if (!isValidNpmName(scope) || !isValidNpmName(name)) return null
     return `${parts[0]}/${parts[1]}`
   }
-  return importPath.split('/')[0]
+  const name = importPath.split('/')[0]
+  return isValidNpmName(name) ? name : null
 }
 
 export function extractImports(code: string): string[] {

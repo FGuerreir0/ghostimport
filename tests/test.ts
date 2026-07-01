@@ -1,4 +1,4 @@
-import { extractImports, checkNpm, loadConfig, loadCache, saveCache } from '../src/index'
+import { extractImports, checkNpm, checkScary, detectTyposquat, loadConfig, loadCache, saveCache } from '../src/index'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -37,6 +37,9 @@ assert(!includes(extractImports(`import x from './utils'`), './utils'), 'ignores
 assert(!includes(extractImports(`import x from '../config'`), '../config'), 'ignores parent relative imports')
 assert(includes(extractImports(`import x from 'zod/v3'`), 'zod'), 'extracts base name from subpath import')
 assert(includes(extractImports(`export { x } from 'some-pkg'`), 'some-pkg'), 'detects re-export from')
+assert(!includes(extractImports(`var x = ' + obj.partner'`), ' + obj.partner'), 'rejects expressions with spaces and operators')
+assert(!includes(extractImports(`require(' + ISO_CODES[obj.partner.toLowerCase()]')`), ' + ISO_CODES[obj.partner.toLowerCase()]'), 'rejects expressions with brackets')
+assert(!includes(extractImports("import 'multi\nline'"), 'multi'), 'rejects cross-line matches')
 
 // ─── checkNpm (live) ──────────────────────────────────────────────────────────
 
@@ -93,6 +96,49 @@ assert(customConfig.ignore[0] === '@company/*', 'custom config preserves pattern
 assert(customConfig.includeUndeclared === false, 'custom config overrides includeUndeclared')
 
 fs.rmSync(tmpDir, { recursive: true })
+
+// ─── detectTyposquat ─────────────────────────────────────────────────────────
+
+console.log('\ndetectTyposquat()')
+
+assert(detectTyposquat('axois') === 'axios', 'catches transposition (axois → axios)')
+assert(detectTyposquat('expres') === 'express', 'catches missing char (expres → express)')
+assert(detectTyposquat('webpakc') === 'webpack', 'catches character swap (webpakc → webpack)')
+assert(detectTyposquat('lodsh') === 'lodash', 'catches missing char (lodsh → lodash)')
+assert(detectTyposquat('lodash') === null, 'returns null for exact match (lodash)')
+assert(detectTyposquat('react') === null, 'returns null for exact match (react)')
+assert(detectTyposquat('pg') === null, 'returns null for names shorter than 5 chars')
+assert(detectTyposquat('zxcvbn') === null, 'returns null for unrelated names')
+assert(detectTyposquat('@types/reakt') === 'react', 'strips scope before comparing (@types/reakt → react)')
+
+// ─── checkScary (live) ───────────────────────────────────────────────────────
+
+console.log('\ncheckScary() — live npm registry calls')
+
+const [scaryFake, scaryReact] = await Promise.all([
+  checkScary('this-package-absolutely-does-not-exist-ghostimport-test-xyz123'),
+  checkScary('react'),
+])
+
+if (scaryFake.exists === null) {
+  console.log(`  ℹ network unavailable (${scaryFake.error}) — skipping checkScary tests`)
+} else {
+  assert(scaryFake.exists === false, 'non-existent package returns exists: false')
+  if (scaryFake.exists === false) {
+    assert(scaryFake.squatRisk === 'available', 'non-existent package has squatRisk: available')
+  }
+
+  if (scaryReact.exists === true) {
+    assert(scaryReact.risk === 'low', '"react" has low supply chain risk')
+    assert(Array.isArray(scaryReact.installScripts), '"react" has installScripts array')
+    assert(scaryReact.installScripts.length === 0, '"react" has no install hooks')
+    assert(scaryReact.typosquatOf === null, '"react" is not flagged as a typosquat')
+    assert(typeof scaryReact.maintainers === 'number', '"react" has maintainers count')
+    assert(scaryReact.maintainers > 0, '"react" has at least one maintainer')
+    // single maintainer should not trigger risk alone for established packages
+    assert(!scaryReact.flags.includes('single maintainer'), '"react" single-maintainer flag not set without other signals')
+  }
+}
 
 // ─── Summary ──────────────────────────────────────────────────────────────────
 
