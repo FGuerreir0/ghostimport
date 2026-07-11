@@ -3,6 +3,7 @@ import { readFileSync, watch as fsWatch, statSync } from 'fs'
 import { fileURLToPath } from 'url'
 import { scan } from './scan'
 import { loadConfig } from './config'
+import { CODE_EXTS } from './files'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
@@ -239,7 +240,6 @@ async function runScan() {
 const issues = await runScan()
 
 if (flags.watch) {
-  const CODE_EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'])
   let debounce: ReturnType<typeof setTimeout> | null = null
 
   console.log(c.gray(`  Watching for changes in ${targetDir}...\n`))

@@ -1,4 +1,4 @@
-import { extractImports, checkNpm, checkScary, detectTyposquat, loadConfig, loadCache, saveCache } from '../src/index'
+import { extractImports, extractSfcScripts, checkNpm, checkScary, detectTyposquat, loadConfig, loadCache, saveCache } from '../src/index'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -40,6 +40,63 @@ assert(includes(extractImports(`export { x } from 'some-pkg'`), 'some-pkg'), 'de
 assert(!includes(extractImports(`var x = ' + obj.partner'`), ' + obj.partner'), 'rejects expressions with spaces and operators')
 assert(!includes(extractImports(`require(' + ISO_CODES[obj.partner.toLowerCase()]')`), ' + ISO_CODES[obj.partner.toLowerCase()]'), 'rejects expressions with brackets')
 assert(!includes(extractImports("import 'multi\nline'"), 'multi'), 'rejects cross-line matches')
+
+// ─── extractSfcScripts ───────────────────────────────────────────────────────
+
+console.log('\nextractSfcScripts()')
+
+const vueSfc = `<template>
+  <p>To install, write: import x from 'template-fake-pkg'</p>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import axios from 'axios'
+</script>
+
+<script>
+import legacy from 'vue-legacy-helper'
+</script>`
+
+const vueImports = extractImports(extractSfcScripts(vueSfc, '.vue'))
+assert(includes(vueImports, 'vue'), 'vue: detects import in <script setup>')
+assert(includes(vueImports, 'axios'), 'vue: detects second import in same block')
+assert(includes(vueImports, 'vue-legacy-helper'), 'vue: detects import in second <script> block')
+assert(!includes(vueImports, 'template-fake-pkg'), 'vue: ignores package names in template markup')
+
+const svelteSfc = `<script context="module">
+  import { writable } from 'svelte/store'
+</script>
+
+<script>
+  import dayjs from 'dayjs'
+</script>
+
+<h1>import nothing from 'markup-fake-pkg'</h1>`
+
+const svelteImports = extractImports(extractSfcScripts(svelteSfc, '.svelte'))
+assert(includes(svelteImports, 'svelte'), 'svelte: detects import in module script')
+assert(includes(svelteImports, 'dayjs'), 'svelte: detects import in instance script')
+assert(!includes(svelteImports, 'markup-fake-pkg'), 'svelte: ignores package names in markup')
+
+const astroSfc = `---
+import Layout from '../layouts/Layout.astro'
+import { z } from 'zod'
+---
+
+<Layout>
+  <script>
+    import confetti from 'canvas-confetti'
+  </script>
+</Layout>`
+
+const astroImports = extractImports(extractSfcScripts(astroSfc, '.astro'))
+assert(includes(astroImports, 'zod'), 'astro: detects import in frontmatter')
+assert(includes(astroImports, 'canvas-confetti'), 'astro: detects import in <script> block')
+assert(!includes(astroImports, '../layouts/Layout.astro'), 'astro: ignores relative imports in frontmatter')
+
+assert(extractSfcScripts('<template><p>no scripts here</p></template>', '.vue') === '', 'returns empty string when no script blocks exist')
+assert(!includes(extractImports(extractSfcScripts(`---\nnot frontmatter\n---`, '.vue')), 'not'), 'vue: does not treat --- fences as frontmatter')
 
 // ─── checkNpm (live) ──────────────────────────────────────────────────────────
 

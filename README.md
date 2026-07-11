@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="128" alt="ghostimport logo">
+</p>
+
 ![CI](https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg)
 [![ghostimport](https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen)](https://github.com/FGuerreir0/ghostimport)
 # ghostimport
@@ -163,6 +167,11 @@ const imports = extractImports(`
   import { createAgent } from '@fake/pkg'
 `)
 // ['react', '@fake/pkg']
+
+// Extract the script code from a single-file component (.vue/.svelte/.astro)
+import { extractSfcScripts } from 'ghostimport'
+const code = extractSfcScripts(vueFileContents, '.vue')
+const sfcImports = extractImports(code)
 ```
 
 ### TypeScript types
@@ -234,6 +243,7 @@ interface ScanOptions {
 - `export { x } from 'pkg'`
 - Scoped packages: `@scope/name`
 - Subpath imports: `pkg/utils` → checks `pkg`
+- Single-file components: `<script>` blocks in `.vue`, `.svelte`, and `.astro` files (plus Astro `---` frontmatter) — markup is ignored, so a package name mentioned in template text is never flagged
 
 **Automatically ignores:**
 - Node.js built-ins (`fs`, `path`, `crypto`, `node:*`, ...)
@@ -243,7 +253,7 @@ interface ScanOptions {
 - Virtual modules (`virtual:`, Vite/Rollup internals)
 - `node_modules/`, `dist/`, `.git/`, `build/`
 
-**Supported file types:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs`
+**Supported file types:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs` `.vue` `.svelte` `.astro`
 
 ---
 
@@ -354,6 +364,7 @@ Source layout:
 |---|---|
 | `src/types.ts` | All exported TypeScript interfaces |
 | `src/imports.ts` | Import extraction (regex) |
+| `src/sfc.ts` | Script extraction from `.vue` / `.svelte` / `.astro` files |
 | `src/cache.ts` | Local registry cache (`~/.ghostimport/`) |
 | `src/config.ts` | `.ghostimportrc.json` loading |
 | `src/npm.ts` | npm registry checks, `checkScary`, `detectTyposquat` |

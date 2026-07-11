@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'build', '.next', 'coverage', '.cache'])
-const CODE_EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs'])
+export const CODE_EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.vue', '.svelte', '.astro'])
 
 export function walkFiles(dir: string): string[] {
   const results: string[] = []

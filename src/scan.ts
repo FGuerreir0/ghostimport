@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import { extractImports } from './imports'
+import { extractSfcScripts, SFC_EXTS } from './sfc'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
 import { checkNpm, checkScary, detectTyposquat } from './npm'
@@ -27,6 +28,8 @@ export async function scan(
   for (const file of files) {
     let code: string
     try { code = fs.readFileSync(file, 'utf8') } catch { continue }
+    const ext = path.extname(file)
+    if (SFC_EXTS.has(ext)) code = extractSfcScripts(code, ext)
     for (const pkg of extractImports(code)) {
       if (!importMap.has(pkg)) importMap.set(pkg, [])
       importMap.get(pkg)!.push(path.relative(targetDir, file))

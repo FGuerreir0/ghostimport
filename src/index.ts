@@ -1,4 +1,5 @@
 export { extractImports } from './imports'
+export { extractSfcScripts } from './sfc'
 export { loadCache, saveCache } from './cache'
 export { loadConfig } from './config'
 export { checkNpm, checkScary, detectTyposquat } from './npm'
