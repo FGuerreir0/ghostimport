@@ -5,7 +5,7 @@ import { extractSfcScripts, SFC_EXTS } from './sfc'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
 import { checkNpm, checkPackageRisk, detectTyposquat } from './npm'
-import { walkFiles, readPackageJsonDeps, readWorkspacePackages, readTsconfigPaths } from './files'
+import { walkProject, contextFromFiles, isResolvedLocally } from './files'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
 const CONCURRENCY = 10
@@ -15,10 +15,12 @@ export async function scan(
   { onProgress, useCache = true, deep = true, config }: ScanOptions = {},
 ): Promise<ScanResult> {
   const conf = config ?? loadConfig(targetDir)
-  const files = walkFiles(targetDir)
-  const declaredDeps = readPackageJsonDeps(targetDir)
-  const workspacePkgs = readWorkspacePackages(targetDir)
-  const tsconfigAliases = readTsconfigPaths(targetDir)
+  const project = walkProject(targetDir)
+  const files = project.code
+  // Every package.json, tsconfig and import map in the tree — not just the ones at
+  // the root. A dependency declared in a workspace is still declared.
+  const ctx = contextFromFiles(project, targetDir)
+  const declaredDeps = ctx.declared
 
   const cache: Record<string, CacheEntry> = useCache ? loadCache() : {}
   let cacheHits = 0
@@ -37,7 +39,7 @@ export async function scan(
   }
 
   const allPkgs = [...importMap.keys()].filter(
-    pkg => !matchesIgnore(pkg, conf.ignore) && !workspacePkgs.has(pkg) && !tsconfigAliases.has(pkg),
+    pkg => !matchesIgnore(pkg, conf.ignore) && !isResolvedLocally(pkg, ctx),
   )
 
   const results: ScanResult = {

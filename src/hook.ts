@@ -15,7 +15,7 @@ import fs from 'fs'
 import path from 'path'
 import { extractImports } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
-import { CODE_EXTS, readWorkspacePackages, readTsconfigPaths } from './files'
+import { CODE_EXTS, readProjectContext, isResolvedLocally } from './files'
 import { loadConfig, matchesIgnore } from './config'
 import { extractInstallTargets } from './install'
 import { verifyPackages, describeVerdict } from './verify'
@@ -27,6 +27,7 @@ const BLOCK = 2
 // Bounded so a slow registry can never stall the agent
 const BUDGET_MS = 20_000
 const MAX_PACKAGES = 40
+const HOOK_SCAN_DEPTH = 4
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
@@ -50,9 +51,9 @@ function readStdin(): Promise<string> {
 /** Packages that are legitimately unresolvable against the registry in this project. */
 function localNames(cwd: string): (pkg: string) => boolean {
   const config = loadConfig(cwd)
-  const workspaces = readWorkspacePackages(cwd)
-  const aliases = readTsconfigPaths(cwd)
-  return (pkg) => matchesIgnore(pkg, config.ignore) || workspaces.has(pkg) || aliases.has(pkg)
+  // Depth-bounded: this runs on every edit, so it must not walk a huge tree.
+  const ctx = readProjectContext(cwd, HOOK_SCAN_DEPTH)
+  return (pkg) => matchesIgnore(pkg, config.ignore) || isResolvedLocally(pkg, ctx)
 }
 
 function report(verdicts: PackageVerdict[], context: string, guidance: string): string {

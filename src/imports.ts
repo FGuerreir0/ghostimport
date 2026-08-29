@@ -22,6 +22,10 @@ const BUILTIN_MODULES = new Set([
 // Valid npm package name segment: letters, digits, hyphens, underscores, dots
 const VALID_PKG_NAME = /^[a-zA-Z0-9_][a-zA-Z0-9._-]*$/
 
+// Dots are legal in npm names (socket.io, uWebSockets.js), so a specifier is only
+// rejected on an extension that no npm package could plausibly end in.
+const NON_JS_EXT = /\.(dart|css|s[ac]ss|less|json|svg|png|jpe?g|gif|webp|avif|wasm|txt|md|ya?ml|toml|html?|py|rb|go|rs|java|php|sh)$/i
+
 function isValidNpmName(name: string): boolean {
   return VALID_PKG_NAME.test(name)
 }
@@ -53,6 +57,7 @@ function toPackageName(importPath: string): string | null {
     return `${parts[0]}/${parts[1]}`
   }
   const name = importPath.split('/')[0]
+  if (NON_JS_EXT.test(name)) return null
   return isValidNpmName(name) ? name : null
 }
 

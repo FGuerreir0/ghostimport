@@ -8,6 +8,7 @@ import { loadConfig } from '../src/config'
 import { loadCache, saveCache } from '../src/cache'
 import { hasBlockingVerdict } from '../src/verify'
 import { specToPackageName } from '../src/install'
+import { readProjectContext, isResolvedLocally } from '../src/files'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -43,6 +44,10 @@ assert(!includes(extractImports(`import fs from 'fs'`), 'fs'), 'ignores node bui
 assert(!includes(extractImports(`import x from 'node:path'`), 'node:path'), 'ignores node: prefixed builtins')
 assert(!includes(extractImports(`import test from 'node:test'`), 'node:test'), 'ignores node:test')
 assert(!includes(extractImports(`import { readFile } from 'node:fs/promises'`), 'node:fs/promises'), 'ignores node: subpath builtins')
+assert(!includes(extractImports(`import x from 'shared.dart'`), 'shared.dart'), 'ignores specifiers ending in a non-JS extension')
+assert(!includes(extractImports(`import x from 'styles.css'`), 'styles.css'), 'ignores a stylesheet specifier')
+assert(includes(extractImports(`import x from 'socket.io'`), 'socket.io'), 'keeps dotted names that are real packages')
+assert(includes(extractImports(`import x from 'uWebSockets.js'`), 'uWebSockets.js'), 'keeps a .js-suffixed package name')
 assert(!includes(extractImports(`import x from './utils'`), './utils'), 'ignores relative imports')
 assert(!includes(extractImports(`import x from '../config'`), '../config'), 'ignores parent relative imports')
 assert(includes(extractImports(`import x from 'zod/v3'`), 'zod'), 'extracts base name from subpath import')
@@ -293,6 +298,48 @@ if (!networkAvailable) {
 }
 
 fs.rmSync(scanDir, { recursive: true })
+
+// ─── project context ─────────────────────────────────────────────────────────
+//
+// A name absent from the registry is only a finding if nothing in the repo already
+// answers for it. Every case below was a real false positive found by scanning 174
+// public repos: nested manifests, scoped path aliases, import maps, framework scopes.
+
+console.log('\nproject context')
+
+const ctxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostimport-ctx-'))
+const write = (rel: string, data: unknown): void => {
+  const full = path.join(ctxDir, rel)
+  fs.mkdirSync(path.dirname(full), { recursive: true })
+  fs.writeFileSync(full, typeof data === 'string' ? data : JSON.stringify(data))
+}
+
+write('package.json', { name: 'root-app', dependencies: { '@docusaurus/core': '^3.0.0' } })
+write('tsconfig.json', `{
+  // a comment, and a trailing comma
+  "compilerOptions": { "paths": { "@commands/*": ["./src/commands/*"] } },
+}`)
+write('Imports.json', { imports: { YAML: 'https://deno.land/std@0.148.0/encoding/yaml.ts' } })
+write('deno.json', { imports: {} })
+write('imports-config.json', { imports: { 'not-a-map': './x.js' }, buildTarget: 'es2020' })
+write('packages/sdk/package.json', { name: '@acme/sdk', dependencies: { lodash: '^4.17.0' } })
+write('packages/sdk/tsconfig.json', { compilerOptions: { paths: { '@utils/*': ['./utils/*'] } } })
+
+const ctx = readProjectContext(ctxDir)
+const resolves = (pkg: string): boolean => isResolvedLocally(pkg, ctx)
+
+assert(ctx.declared.has('lodash'), 'reads dependencies from a nested package.json')
+assert(ctx.local.has('@acme/sdk'), 'treats any package.json name in the tree as local')
+assert(resolves('@commands/types'), 'a scoped path alias answers for its subpaths')
+assert(resolves('@utils/format'), 'reads path aliases from a nested tsconfig')
+assert(resolves('YAML'), 'reads an import map whose values are https URLs')
+assert(resolves('@theme/Layout'), 'Docusaurus projects resolve @theme themselves')
+assert(resolves('@std/assert'), 'a Deno project resolves @std from JSR, not npm')
+assert(!resolves('not-a-map'), 'a JSON file that is not an import map is ignored')
+assert(!resolves('react'), 'an ordinary dependency still goes to the registry')
+
+fs.rmSync(ctxDir, { recursive: true })
+
 
 // ─── MCP server (subprocess) ─────────────────────────────────────────────────
 
