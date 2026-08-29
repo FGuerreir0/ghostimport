@@ -157,7 +157,7 @@ Optional `.ghostimportrc.json` in your project root:
 <summary>CI: GitHub Actions and pre-commit</summary>
 
 ```yaml
-- uses: FGuerreir0/ghostimport@v0.5.0
+- uses: FGuerreir0/ghostimport@v0.5.1
   with:
     path: '.'
 ```
@@ -169,7 +169,7 @@ For [pre-commit](https://pre-commit.com), in `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/FGuerreir0/ghostimport
-    rev: v0.5.0
+    rev: v0.5.1
     hooks:
       - id: ghostimport
 ```

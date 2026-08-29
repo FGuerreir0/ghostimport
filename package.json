@@ -1,6 +1,6 @@
 {
   "name": "ghostimport",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Stops AI coding agents from installing npm packages that don't exist. MCP server + hooks that block slopsquatting and typosquat supply-chain attacks.",
   "keywords": [
     "npm",
