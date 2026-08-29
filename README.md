@@ -2,377 +2,297 @@
   <img src="assets/logo.png" width="128" alt="ghostimport logo">
 </p>
 
-![CI](https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg)
-[![ghostimport](https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen)](https://github.com/FGuerreir0/ghostimport)
-# ghostimport
+<h1 align="center">ghostimport</h1>
 
-**Detects ghost imports — npm packages that don't exist, hallucinated by AI coding tools like Cursor, Copilot, and Claude**
+<p align="center">
+  <strong>Stops your AI coding agent from installing npm packages that don't exist.</strong>
+</p>
 
-AI coding tools sometimes generate `import` statements for packages that don't exist on npm. `ghostimport` scans your codebase and flags them before they cause a build failure — or worse, before an attacker registers the name with a malicious payload.
+<p align="center">
+  <img src="https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <a href="https://www.npmjs.com/package/ghostimport"><img src="https://img.shields.io/npm/v/ghostimport" alt="npm"></a>
+  <a href="https://github.com/FGuerreir0/ghostimport"><img src="https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen" alt="ghostimport"></a>
+</p>
+
+<p align="center">
+  <a href="https://fguerreir0.github.io/ghostimport/"><strong>How the attack works →</strong></a>
+</p>
+
+---
+
+Your agent invents a package name. It doesn't exist on npm *yet*. Someone is watching for exactly that, and the moment they register it, `npm install` runs their `postinstall` script on your machine.
+
+This is **slopsquatting**. `npm audit`, Snyk and Socket don't catch it — they only inspect packages you've already installed. ghostimport checks names against the live registry at the moment your agent writes or installs them.
 
 ```
-$ npx ghostimport
+$ ghostimport
 
-  ghostimport v0.4.0
-  Scanning /my-project
+  Scanned 142 files · 38 packages
 
-  Scanned 142 files · 38 unique packages checked
-
-  ✗ 2 hallucinated packages (do not exist on npm):
-
-  ● @openai/functions-runtime
-    ↳ src/agents/runner.ts
-    ↳ src/agents/tools.ts
-
-  ● react-server-fetch
+  ✗ react-server-fetch  does not exist on npm
     ↳ src/data/loader.ts
+    ↳ unregistered — anyone could claim this name with a malicious postinstall
 
-  Found 2 issues.
+  ✗ axois  high risk
+    ↳ src/api/client.ts
+    ↳ 1-2 chars from 'axios' — likely a typo
+    ↳ has postinstall script — runs code on npm install
+    created 2019-08-29 · 1245/week · 1 version
+
+  2 problems found.
 ```
-
----
-
-## Why this exists
-
-When an LLM generates code, it predicts the most likely next token — not the most accurate one. It will confidently write `import { createAgent } from '@langchain/agent-runtime'` even if that exact package doesn't exist.
-
-The result: your build fails, or your CI breaks at 2am, or — in the worst case — an attacker who monitors public GitHub repos for unregistered package names [registers it with a `postinstall` script that exfiltrates your `.env`](https://vibedoctor.io/blog/hallucinated-imports-ai-packages-dont-exist).
-
-`ghostimport` catches this in seconds.
-
----
 
 ## Install
 
-Requires Node.js 22 or later.
-
 ```bash
-# Run once (no install needed)
-npx ghostimport
-
-# Or install globally
-npm install -g ghostimport
-
-# Or as a dev dependency
-npm install --save-dev ghostimport
+npm install -g ghostimport     # or: npx ghostimport
 ```
 
----
+Node.js 22+. Zero runtime dependencies — the published package uses only Node built-ins.
 
-## Usage
+## Use it with your AI agent
 
-```bash
-# Scan current directory
-ghostimport
+This is the part that matters. A CI check tells you about a bad package *after* it's in your repo; these stop it at the moment it's written.
 
-# Scan a specific folder
-ghostimport ./src
+### Hooks — the enforcing one
 
-# Only show problems (great for CI)
-ghostimport --quiet
+Add to `.claude/settings.json`:
 
-# JSON output (pipe to other tools)
-ghostimport --json
-
-# Skip "missing from package.json" warnings
-ghostimport --no-undeclared
-
-# Watch mode (re-scans on file changes)
-ghostimport --watch
-
-# Check supply chain attack risk (squatting)
-ghostimport --scary
-
-# Skip the local registry cache
-ghostimport --no-cache
-
-# Print a README badge after scan
-ghostimport --badge
-
-# Help
-ghostimport --help
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "ghostimport hook" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "Edit|Write|MultiEdit", "hooks": [{ "type": "command", "command": "ghostimport hook" }] }
+    ]
+  }
+}
 ```
 
-### Add to CI (GitHub Actions)
+- **`PreToolUse` on Bash** — reads any install command and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or ships an install script. This is the one that stops a real attack.
+- **`PostToolUse` on edits** — checks imports the agent just wrote and tells it to fix them.
 
-Use the built-in action for the simplest setup:
+The agent sees why it was stopped:
+
+```
+ghostimport blocked this: the install command below would fetch packages that
+are unsafe or do not exist.
+
+  • 'axois' exists but is high risk: name is 1-2 chars from 'axios';
+    single version published.
+
+Do not retry this command as written.
+```
+
+**It fails open.** Registry unreachable, malformed payload, or a check exceeding its 20-second budget → exits 0 and stays out of the way. A security tool that wedges your agent when you're offline gets uninstalled by Friday.
+
+### MCP — the self-service one
+
+Lets the model verify a name *before* it writes the import. Hooks are mandatory; MCP tools are offered — use both.
+
+```bash
+claude mcp add ghostimport -- npx -y ghostimport mcp
+```
+
+<details>
+<summary>Cursor, Windsurf, and other MCP clients</summary>
+
+Add to `.cursor/mcp.json` or your client's config:
+
+```json
+{
+  "mcpServers": {
+    "ghostimport": {
+      "command": "npx",
+      "args": ["-y", "ghostimport", "mcp"]
+    }
+  }
+}
+```
+
+| Tool | What it does |
+|---|---|
+| `check_packages` | Verify package names exist on npm. `deep` adds risk heuristics. |
+| `check_install_command` | Vet a full `npm`/`pnpm`/`yarn`/`bun` install command. |
+| `scan_project` | Audit a whole directory. |
+
+</details>
+
+## CLI
+
+```bash
+ghostimport              # scan the current directory
+ghostimport ./src        # scan a folder
+ghostimport --json       # machine-readable
+ghostimport --watch      # re-scan on change
+```
+
+Exits `1` if any imported package doesn't exist, so it works as a CI gate as-is.
+
+<details>
+<summary>All options</summary>
+
+| Flag | Effect |
+|---|---|
+| `--quiet`, `-q` | Only show problems |
+| `--json` | Output results as JSON |
+| `--watch`, `-w` | Re-scan on file changes |
+| `--badge` | Print a README badge after scanning |
+| `--fast` | Skip the deep supply-chain check on undeclared packages |
+| `--no-undeclared` | Hide "imported but not in package.json" warnings |
+| `--no-cache` | Bypass the 24h registry cache |
+| `--version`, `-v` · `--help`, `-h` | |
+
+Optional `.ghostimportrc.json` in your project root:
+
+```json
+{ "ignore": ["@company/*", "internal-lib"], "includeUndeclared": true }
+```
+
+</details>
+
+<details>
+<summary>CI: GitHub Actions and pre-commit</summary>
 
 ```yaml
-- name: Check for hallucinated packages
-  uses: FGuerreir0/ghostimport@v0.4.0
+- uses: FGuerreir0/ghostimport@v0.5.0
   with:
     path: '.'
-    scary: 'false'
 ```
 
-Or run directly:
+Or just `run: npx ghostimport --quiet`.
 
-```yaml
-- name: Check for hallucinated packages
-  run: npx ghostimport --quiet
-```
-
-This step will fail (exit code 1) if any hallucinated packages are found.
-
-### Pre-commit
-
-Add to `.pre-commit-config.yaml`:
+For [pre-commit](https://pre-commit.com), in `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
   - repo: https://github.com/FGuerreir0/ghostimport
-    rev: v0.4.0
+    rev: v0.5.0
     hooks:
       - id: ghostimport
 ```
 
----
+</details>
 
-## Programmatic API
+## API
 
 ```ts
-import { scan, extractImports, checkNpm, checkScary, detectTyposquat } from 'ghostimport'
+import { verifyPackages, scan } from 'ghostimport'
 
-// Scan a directory
-const results = await scan('./src')
+await verifyPackages(['axios', 'axois'], { deep: true })
+// [ { pkg: 'axios', status: 'ok', typosquatOf: null },
+//   { pkg: 'axois', status: 'suspicious', risk: 'high', typosquatOf: 'axios', ... } ]
 
-console.log(results.hallucinated)
-// [{ pkg: '@openai/functions-runtime', files: ['src/agents/runner.ts'] }]
-
-console.log(results.notInPackageJson)
-// [{ pkg: 'zod', files: ['src/validate.ts'] }]
-
-// Scan with scary mode enabled
-const scaryResults = await scan('./src', { scary: true })
-console.log(scaryResults.scary)
-// [{ type: 'available', pkg: 'axois', typosquatOf: 'axios', files: [...] }]
-
-// Check a single package exists on npm
-const { exists } = await checkNpm('some-package-name')
-// exists: true | false | null (null = network error)
-
-// Deep supply chain check for a single package
-const info = await checkScary('some-package-name')
-// info.exists, info.risk, info.installScripts, info.typosquatOf, ...
-
-// Check if a name looks like a typosquat of a popular package
-detectTyposquat('axois')    // => 'axios'
-detectTyposquat('expres')   // => 'express'
-detectTyposquat('lodash')   // => null (exact match, not a typosquat)
-detectTyposquat('zxcvbn')   // => null (unrelated)
-
-// Extract imports from a string
-const imports = extractImports(`
-  import React from 'react'
-  import { createAgent } from '@fake/pkg'
-`)
-// ['react', '@fake/pkg']
-
-// Extract the script code from a single-file component (.vue/.svelte/.astro)
-import { extractSfcScripts } from 'ghostimport'
-const code = extractSfcScripts(vueFileContents, '.vue')
-const sfcImports = extractImports(code)
+const { missing, undeclared, risks } = await scan('./src')
 ```
 
-### TypeScript types
+`status` is `'ok' | 'missing' | 'suspicious' | 'unknown'`. `'unknown'` means the registry was unreachable — never treat it as a failure.
 
-The package ships with full TypeScript declarations. Key types:
+<details>
+<summary>Full API and TypeScript types</summary>
+
+| Export | Purpose |
+|---|---|
+| `scan(dir, opts?)` | Scan a directory. Returns `ScanResult`. |
+| `verifyPackages(names, opts?)` | Check a list of names. Returns `PackageVerdict[]`. |
+| `checkNpm(name)` | Does this one package exist? |
+| `checkPackageRisk(name)` | Full supply-chain check for one package. |
+| `detectTyposquat(name)` | Returns the popular package it's 1-2 chars from, or `null`. |
+| `extractImports(code)` | Package names from a source string. |
+| `extractInstallTargets(cmd)` | Packages a shell command would install. |
 
 ```ts
-import type { ScanResult, ScanOptions, ScaryEntry, ScaryCheckResult, NpmCheckResult } from 'ghostimport'
-
 interface ScanResult {
-  scanned: number          // total files scanned
-  packages: number         // unique packages found
-  hallucinated: {          // packages that DON'T exist on npm
-    pkg: string
-    files: string[]
-  }[]
-  notInPackageJson: {      // packages that exist but aren't declared
-    pkg: string
-    files: string[]
-  }[]
-  errors: {                // packages that couldn't be checked (network)
-    pkg: string
-    error: string
-    files: string[]
-  }[]
-  scary: ScaryEntry[]      // supply chain risk entries (--scary mode)
+  scanned: number
+  packages: number
+  missing: { pkg: string; files: string[] }[]     // don't exist on npm
+  undeclared: { pkg: string; files: string[] }[]  // exist, but not in package.json
+  risks: RiskEntry[]                              // supply-chain findings
+  errors: { pkg: string; error: string; files: string[] }[]
   cacheHits: number
 }
 
-// ScaryEntry is a discriminated union on `type`
-type ScaryEntry =
-  | {
-      type: 'available'      // name does NOT exist on npm — free to squat
-      pkg: string
-      files: string[]
-      typosquatOf: string | null  // e.g. 'axios' if name is 1-2 chars away
-    }
-  | {
-      type: 'suspicious'     // name EXISTS on npm but looks risky
-      pkg: string
-      files: string[]
-      risk: 'medium' | 'high'
-      flags: string[]        // human-readable reasons
-      installScripts: string[]    // e.g. ['postinstall'] — runs on npm install
-      typosquatOf: string | null  // e.g. 'lodash' if name is 1-2 chars away
-      maintainers: number         // number of npm maintainers
-      created: string        // ISO date, e.g. '2024-11-01'
-      downloads: number | null    // weekly downloads
-      versions: number       // total published versions
-    }
-
-interface ScanOptions {
-  onProgress?: (p: { pkg: string; exists: boolean | null; done: number; total: number }) => void
-  useCache?: boolean       // default: true
-  scary?: boolean          // default: false
-  config?: Config
-}
+type RiskEntry =
+  | { pkg: string; files: string[]; type: 'unregistered'; typosquatOf: string | null }
+  | { pkg: string; files: string[]; type: 'suspicious'
+      risk: 'medium' | 'high'; flags: string[]; installScripts: string[]
+      typosquatOf: string | null; maintainers: number
+      created: string; downloads: number | null; versions: number }
 ```
 
----
+Types are shipped with the package: `ScanResult`, `ScanOptions`, `RiskEntry`, `PackageVerdict`, `VerdictStatus`, `PackageRiskResult`, `NpmCheckResult`, `Config`.
 
-## What it scans
+</details>
 
-- `import x from 'pkg'`
-- `import { x } from 'pkg'`
-- `import * as x from 'pkg'`
-- `require('pkg')`
-- `await import('pkg')`
-- `export { x } from 'pkg'`
-- Scoped packages: `@scope/name`
-- Subpath imports: `pkg/utils` → checks `pkg`
-- Single-file components: `<script>` blocks in `.vue`, `.svelte`, and `.astro` files (plus Astro `---` frontmatter) — markup is ignored, so a package name mentioned in template text is never flagged
+<details>
+<summary>What gets scanned, and what raises a risk</summary>
 
-**Automatically ignores:**
-- Node.js built-ins (`fs`, `path`, `crypto`, `node:*`, ...)
-- Relative imports (`./`, `../`)
-- Path aliases (`@/`, `~/`, `$lib/`, and tsconfig `paths`)
-- URL/protocol imports (`https:`, `data:`, `bun:`, ...)
-- Virtual modules (`virtual:`, Vite/Rollup internals)
-- `node_modules/`, `dist/`, `.git/`, `build/`
+**Detects:** `import`, `require()`, dynamic `import()`, `export … from`, scoped packages, subpath imports (`pkg/utils` → `pkg`), and `<script>` blocks in `.vue`, `.svelte` and `.astro` (markup is ignored, so a package name in template text is never flagged).
 
-**Supported file types:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs` `.vue` `.svelte` `.astro`
+**Extensions:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs` `.vue` `.svelte` `.astro`
 
----
+**Ignores:** Node built-ins, relative imports, path aliases (`@/`, `~/`, `$lib/`, tsconfig `paths`), URL/protocol imports, virtual modules, workspace packages, and `node_modules/` `dist/` `build/` `.git/`.
 
-## Supply chain risk (`--scary`)
+**Risk signals:**
 
-```bash
-ghostimport --scary
-```
-
-Scary mode adds two layers of supply chain analysis on top of the standard scan.
-
-### Layer 1 — Available for squatting (💀)
-
-For every hallucinated package (doesn't exist on npm), ghostimport flags it as available for malicious registration and checks whether the name is suspiciously close to a popular package:
-
-```
-  💀 1 package name available for malicious registration:
-
-  ● axois
-    ↳ TYPOSQUAT: 1-2 chars away from 'axios' — classic squatting pattern
-    ↳ Anyone can register this name with a malicious postinstall script
-    ↳ If installed, it could exfiltrate .env, tokens, SSH keys
-```
-
-The key distinction: these names **do not exist on npm yet**. The risk is that someone registers them before you fix the import.
-
-### Layer 2 — Suspicious existing packages (🕵️)
-
-For packages that exist on npm but aren't in your `package.json`, ghostimport does a deep registry check and flags suspicious signals:
-
-```
-  🕵️  1 suspicious package (potential squats):
-
-  ● some-util [high risk]
-    ↳ CRITICAL: has postinstall hook — executes code on npm install
-    ↳ TYPOSQUAT: 1-2 chars away from 'lodash'
-    ↳ single maintainer
-    created 2024-11-01 · 12 downloads/week · 1 version
-```
-
-### Signals checked
-
-| Signal | Risk weight | Why it matters |
+| Signal | Weight | Why |
 |---|---|---|
-| `postinstall` / `preinstall` / `install` script | **critical → high** | Runs arbitrary code on `npm install` |
-| Name is 1-2 chars from a popular package | **critical → high** | Classic typosquatting pattern |
-| Package created < 30 days ago | medium | New packages with no track record |
-| < 50 weekly downloads | medium | Extremely low adoption |
+| `postinstall` / `preinstall` / `install` script | critical | Runs arbitrary code on `npm install` |
+| Name 1-2 chars from a popular package | critical | Classic typosquat |
+| Created < 30 days ago | medium | No track record |
+| < 50 weekly downloads | medium | Near-zero adoption |
 | Single version published | medium | Abandoned or one-shot |
-| Single maintainer | medium (amplifier only) | Raises risk when combined with other signals — not suspicious alone |
+| Single maintainer | amplifier | Only counts alongside another signal |
 
-Risk is `high` if any critical signal is present, or if 2+ medium signals apply. Only `medium` and `high` packages appear in the output.
+`high` if any critical signal fires, or 2+ medium ones. Only `medium` and `high` are reported.
 
-### `--scary` and JSON
+A name that doesn't exist on npm is *always* reported as squattable — that check costs no extra requests, so `--fast` doesn't disable it.
 
-The `scary` array is included in `--json` output with all fields, making it easy to build custom alerting:
-
-```bash
-ghostimport --scary --json | jq '.scary[] | select(.type == "suspicious" and (.installScripts | length > 0))'
-```
-
----
-
-## Config file
-
-Create `.ghostimportrc.json` in your project root:
-
-```json
-{
-  "ignore": ["@company/*", "internal-lib"],
-  "includeUndeclared": true
-}
-```
-
-| Field | Default | Description |
-|---|---|---|
-| `ignore` | `[]` | Packages or scope patterns to skip (`@scope/*` supported) |
-| `includeUndeclared` | `true` | Warn on packages that exist on npm but aren't in `package.json` |
-
----
-
-## Zero dependencies
-
-`ghostimport` has **no runtime dependencies**. The published package uses only Node.js built-ins. This means:
-
-- No supply chain risk from the tool itself
-- Fast install
-- Works offline for the scan phase (network only needed to check npm)
-
----
+</details>
 
 ## Contributing
 
 ```bash
-git clone https://github.com/FGuerreir0/ghostimport
-cd ghostimport
 npm install
-
-npm run build   # type-check + emit .d.ts + bundle with esbuild
-npm test        # run test suite
-npm run dev     # run CLI from source (no build needed)
-npm run typecheck  # type-check only (no output)
+npm run dev      # run the CLI from source
+npm test         # test suite (makes live registry calls)
+npm run build    # type-check, emit .d.ts, bundle
 ```
-
-Source layout:
 
 | File | Purpose |
 |---|---|
-| `src/types.ts` | All exported TypeScript interfaces |
-| `src/imports.ts` | Import extraction (regex) |
-| `src/sfc.ts` | Script extraction from `.vue` / `.svelte` / `.astro` files |
-| `src/cache.ts` | Local registry cache (`~/.ghostimport/`) |
-| `src/config.ts` | `.ghostimportrc.json` loading |
-| `src/npm.ts` | npm registry checks, `checkScary`, `detectTyposquat` |
-| `src/files.ts` | File walker, `package.json` deps, monorepo support |
 | `src/scan.ts` | Main `scan()` orchestrator |
-| `src/cli.ts` | CLI interface |
+| `src/verify.ts` | `verifyPackages()` — shared by the CLI, MCP server and hook |
+| `src/npm.ts` | Registry checks, risk heuristics, typosquat detection |
+| `src/imports.ts` · `src/sfc.ts` | Import extraction |
+| `src/install.ts` | Parses install commands into package names |
+| `src/mcp.ts` | MCP server (hand-rolled JSON-RPC — no SDK dependency) |
+| `src/hook.ts` | Agent hook |
+| `src/cli.ts` | CLI and subcommand dispatch |
+| `src/files.ts` · `src/config.ts` · `src/cache.ts` | Walking, config, 24h registry cache |
+| `docs/` | The landing page — one static `index.html`, no build step |
 
----
+### The landing page
+
+`docs/` is served at [fguerreir0.github.io/ghostimport](https://fguerreir0.github.io/ghostimport/)
+via **Settings → Pages → main / docs**. Open `docs/index.html` in a browser to preview it —
+there is nothing to install or compile.
+
+It lives in this repo on purpose. **The page quotes real CLI output, the hook config, the MCP
+command and the risk-signals table** — so a change to any of those is a change to the page.
+Keeping both in one commit is the only thing that stops it going quietly stale.
+
+Two conventions worth keeping:
+
+- **Dashed border = a package name nobody owns. Solid border = a real published package.**
+  The attack timeline turns on that switch at step 3; it is the page's whole explanation.
+- **Every number on the page is verified against the live registry.** The `axois` figures
+  (published 2019-08-29, one version, ~1,245 weekly installs) were checked with
+  `checkPackageRisk`. Don't add a statistic you haven't run.
+
+Design tokens — colours, type stack, page width — sit at the top of the `<style>` block.
 
 ## License
 

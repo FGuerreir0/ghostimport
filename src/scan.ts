@@ -4,7 +4,7 @@ import { extractImports } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
-import { checkNpm, checkScary, detectTyposquat } from './npm'
+import { checkNpm, checkPackageRisk, detectTyposquat } from './npm'
 import { walkFiles, readPackageJsonDeps, readWorkspacePackages, readTsconfigPaths } from './files'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
@@ -12,7 +12,7 @@ const CONCURRENCY = 10
 
 export async function scan(
   targetDir: string,
-  { onProgress, useCache = true, scary = false, config }: ScanOptions = {},
+  { onProgress, useCache = true, deep = true, config }: ScanOptions = {},
 ): Promise<ScanResult> {
   const conf = config ?? loadConfig(targetDir)
   const files = walkFiles(targetDir)
@@ -43,10 +43,10 @@ export async function scan(
   const results: ScanResult = {
     scanned: files.length,
     packages: allPkgs.length,
-    hallucinated: [],
-    notInPackageJson: [],
+    missing: [],
+    undeclared: [],
+    risks: [],
     errors: [],
-    scary: [],
     cacheHits: 0,
   }
 
@@ -76,11 +76,11 @@ export async function scan(
       onProgress?.({ pkg, exists, error, total: allPkgs.length, done: i + j + 1 })
 
       if (exists === false) {
-        results.hallucinated.push({ pkg, files: matchedFiles })
+        results.missing.push({ pkg, files: matchedFiles })
       } else if (exists === null && error) {
         results.errors.push({ pkg, error, files: matchedFiles })
       } else if (exists === true && !declaredDeps.has(pkg)) {
-        results.notInPackageJson.push({ pkg, files: matchedFiles })
+        results.undeclared.push({ pkg, files: matchedFiles })
       }
     }
   }
@@ -88,31 +88,30 @@ export async function scan(
   if (useCache) saveCache(cache)
   results.cacheHits = cacheHits
 
-  // Scary mode: flag hallucinated names as available for squatting,
-  // and deep-check undeclared packages for supply chain risk heuristics
-  if (scary) {
-    for (const { pkg, files: matchedFiles } of results.hallucinated) {
-      results.scary.push({ pkg, files: matchedFiles, type: 'available', typosquatOf: detectTyposquat(pkg) })
-    }
+  // Every missing name is squattable by definition — free to derive, no extra requests
+  for (const { pkg, files: matchedFiles } of results.missing) {
+    results.risks.push({ pkg, files: matchedFiles, type: 'unregistered', typosquatOf: detectTyposquat(pkg) })
+  }
 
-    for (const { pkg, files: matchedFiles } of results.notInPackageJson) {
-      const info = await checkScary(pkg)
-      if (info.exists === true && info.risk !== 'low') {
-        results.scary.push({
-          pkg,
-          files: matchedFiles,
-          type: 'suspicious',
-          exists: true,
-          created: info.created,
-          downloads: info.downloads,
-          versions: info.versions,
-          risk: info.risk as 'medium' | 'high',
-          flags: info.flags,
-          installScripts: info.installScripts,
-          typosquatOf: info.typosquatOf,
-          maintainers: info.maintainers,
-        })
-      }
+  // Undeclared packages get the deep check. This is the only part that costs
+  // extra requests, so it is the only part `deep: false` turns off.
+  if (deep) {
+    for (const { pkg, files: matchedFiles } of results.undeclared) {
+      const info = await checkPackageRisk(pkg)
+      if (info.exists !== true || info.risk === 'low') continue
+      results.risks.push({
+        pkg,
+        files: matchedFiles,
+        type: 'suspicious',
+        created: info.created,
+        downloads: info.downloads,
+        versions: info.versions,
+        risk: info.risk,
+        flags: info.flags,
+        installScripts: info.installScripts,
+        typosquatOf: info.typosquatOf,
+        maintainers: info.maintainers,
+      })
     }
   }
 

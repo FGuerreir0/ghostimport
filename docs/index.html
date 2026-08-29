@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ghostimport — the package that wasn't there</title>
+<meta name="description" content="Your AI writes an import for a package that doesn't exist. An attacker registers the name. ghostimport blocks the install before that happens.">
+<link rel="icon" href="assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/">
+<!-- Social cards need absolute URLs — Twitter and Slack drop relative og:image -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/">
+<meta property="og:title" content="ghostimport">
+<meta property="og:description" content="Stops your AI coding agent from installing npm packages that don't exist.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ghostimport">
+<meta name="twitter:description" content="Stops your AI coding agent from installing npm packages that don't exist.">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* ── Tokens ─────────────────────────────────────────────────────────────────
+   Dark-committed: this is a terminal-native security tool and the logo already
+   lives on a dark ground. Every colour is painted explicitly so the page holds
+   on any host background. */
+:root {
+  color-scheme: dark;
+
+  --void:      #0d0d16;
+  --surface:   #14141f;
+  --raised:    #1b1b28;
+  --line:      #262636;
+  --line-soft: #1e1e2c;
+
+  --phantom:   #a8a8f0;
+  --phantom-d: #8080dc;
+  --bone:      #e9e9f3;
+  --muted:     #7d7d95;
+  --faint:     #55556b;
+
+  --breach:    #ff5f56;
+  --breach-dim:#3a1d20;
+  --safe:      #4fd39a;
+  --warn:      #e8b464;
+
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --body:    'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --page:  1080px;
+  --prose: 62ch;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ambient: a faint spectral wash behind the fold, nothing more */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20% -20% auto -20%;
+  height: 70vh;
+  background: radial-gradient(60% 60% at 50% 0%, rgba(168,168,240,.10), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; max-width: var(--page); margin: 0 auto; padding: 0 28px; }
+
+a { color: var(--phantom); text-decoration-color: rgba(168,168,240,.35); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--phantom); }
+:focus-visible { outline: 2px solid var(--phantom); outline-offset: 3px; border-radius: 3px; }
+
+h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.02em; }
+
+/* Eyebrows mark section role, not decoration */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--phantom-d);
+  margin: 0 0 14px;
+}
+
+section { padding: 96px 0; border-top: 1px solid var(--line-soft); }
+section:first-of-type { border-top: 0; }
+.section-head { max-width: var(--prose); margin-bottom: 48px; }
+.section-head h2 { font-size: clamp(28px, 4vw, 40px); }
+.section-head p { color: var(--muted); font-size: 17px; margin: 16px 0 0; }
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+
+.hero { padding: 72px 0 88px; text-align: center; }
+.hero img.mark { width: 92px; height: 92px; border-radius: 22px; display: block; margin: 0 auto 26px; }
+.hero h1 {
+  font-size: clamp(40px, 7vw, 76px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin-bottom: 22px;
+}
+.hero h1 .ghosted {
+  color: var(--phantom);
+  border: 1.5px dashed var(--phantom-d);
+  border-radius: 10px;
+  padding: 0 .18em;
+  /* the dashed rule is the whole thesis: a name with nothing behind it */
+}
+.hero .lede {
+  max-width: 60ch;
+  margin: 0 auto;
+  color: var(--muted);
+  font-size: clamp(17px, 2vw, 19px);
+}
+.hero .lede strong { color: var(--bone); font-weight: 600; }
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 34px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--mono); font-size: 14px; font-weight: 500;
+  padding: 12px 20px; border-radius: 9px; text-decoration: none;
+  border: 1px solid var(--line); color: var(--bone); background: var(--raised);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.btn:hover { border-color: var(--phantom-d); background: #21212f; transform: translateY(-1px); }
+.btn.primary { background: var(--phantom); color: #14141f; border-color: var(--phantom); font-weight: 700; }
+.btn.primary:hover { background: #b8b8f5; border-color: #b8b8f5; }
+
+/* ── Terminal ──────────────────────────────────────────────────────────── */
+
+.term {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  overflow: hidden;
+  text-align: left;
+  box-shadow: 0 24px 60px -28px rgba(0,0,0,.9);
+}
+.term-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--line);
+  background: #10101a;
+}
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); display: block; }
+.term-bar i:first-child { background: #46464f; }
+.term-bar span { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: 8px; }
+.term pre {
+  margin: 0; padding: 22px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.72;
+  overflow-x: auto; color: #b9b9cc;
+}
+.term .p  { color: var(--phantom); }
+.term .r  { color: var(--breach); font-weight: 500; }
+.term .g  { color: var(--safe); }
+.term .y  { color: var(--warn); }
+.term .d  { color: var(--faint); }
+.term .w  { color: var(--bone); font-weight: 500; }
+
+.hero .term { max-width: 780px; margin: 46px auto 0; }
+
+/* ── Attack timeline ───────────────────────────────────────────────────── */
+
+.timeline { display: grid; gap: 0; counter-reset: step; }
+
+.step {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 26px;
+  padding-bottom: 44px;
+  position: relative;
+}
+.step::before {
+  /* the thread running through the sequence */
+  content: "";
+  position: absolute;
+  left: 31px; top: 46px; bottom: -6px;
+  width: 2px;
+  background: var(--line);
+}
+.step:last-child::before { display: none; }
+.step-num {
+  width: 64px; height: 46px;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 15px; font-weight: 700;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.step h3 { font-size: 20px; margin-bottom: 8px; }
+.step p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 16px; }
+.step p + p { margin-top: 10px; }
+
+/* The pivot: where a phantom name becomes a real, hostile package */
+.step.pivot .step-num { color: var(--breach); border-color: var(--breach); background: var(--breach-dim); }
+.step.pivot::before { background: linear-gradient(var(--breach), var(--line)); }
+.step.pivot h3 { color: var(--breach); }
+
+.step.blocked .step-num { color: var(--safe); border-color: var(--safe); background: #14291f; }
+.step.blocked h3 { color: var(--safe); }
+
+.pkg {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--mono); font-size: 13px;
+  padding: 5px 11px; border-radius: 7px;
+  margin-top: 14px;
+}
+.pkg.phantom { border: 1.5px dashed var(--phantom-d); color: var(--phantom); background: rgba(168,168,240,.05); }
+.pkg.claimed { border: 1.5px solid var(--breach);   color: var(--breach);  background: var(--breach-dim); }
+.pkg .tag { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+
+/* ── Coverage gap ──────────────────────────────────────────────────────── */
+
+.lifecycle {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  padding: 30px;
+  overflow-x: auto;
+}
+.lifecycle-track { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 0; min-width: 620px; }
+.phase { padding: 0 16px; border-left: 1px solid var(--line); }
+.phase:first-child { border-left: 0; padding-left: 0; }
+.phase-label { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--bone); margin-bottom: 6px; }
+.phase-when { font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: .06em; text-transform: uppercase; }
+
+.coverage { margin-top: 26px; display: grid; gap: 10px; min-width: 620px; }
+.cov-row { display: grid; grid-template-columns: 148px 1fr; align-items: center; gap: 16px; }
+.cov-name { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.cov-bar { position: relative; height: 34px; border-radius: 8px; background: #10101a; border: 1px solid var(--line-soft); overflow: hidden; }
+.cov-fill {
+  position: absolute; top: 0; bottom: 0;
+  display: grid; place-items: center;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+}
+.cov-fill.late  { left: 50%;  right: 0; background: rgba(125,125,149,.16); color: var(--muted); }
+.cov-fill.early { left: 0;    right: 25%; background: rgba(79,211,154,.14); color: var(--safe); border-right: 1.5px solid var(--safe); }
+
+/* ── Integration cards ─────────────────────────────────────────────────── */
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 22px; }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--surface);
+  padding: 28px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.card.lead { border-color: var(--phantom-d); box-shadow: 0 0 0 1px rgba(168,168,240,.16); }
+.card-role {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .14em; text-transform: uppercase;
+}
+.card.lead .card-role { color: var(--phantom); }
+.card:not(.lead) .card-role { color: var(--faint); }
+.card h3 { font-size: 22px; }
+.card > p { margin: 0; color: var(--muted); font-size: 16px; }
+.card pre {
+  margin: 4px 0 0; padding: 16px;
+  background: #10101a; border: 1px solid var(--line-soft); border-radius: 9px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+  overflow-x: auto; color: #b9b9cc;
+}
+.card pre .k { color: var(--phantom); }
+.card pre .s { color: var(--safe); }
+.card pre .c { color: var(--faint); }
+.card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 15px; }
+.card li { margin-bottom: 6px; }
+.card li strong { color: var(--bone); font-weight: 600; }
+
+/* ── Signals table ─────────────────────────────────────────────────────── */
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; }
+th, td { text-align: left; padding: 15px 22px; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+tbody tr:last-child td { border-bottom: 0; }
+th {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  background: #10101a;
+}
+td:first-child { font-family: var(--mono); font-size: 13px; color: var(--bone); }
+td:last-child { color: var(--muted); }
+.weight {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+}
+.weight.critical { color: var(--breach); background: var(--breach-dim); }
+.weight.medium   { color: var(--warn);   background: #33270f; }
+.weight.amp      { color: var(--muted);  background: #1e1e2c; }
+
+/* ── Closing ───────────────────────────────────────────────────────────── */
+
+.close { text-align: center; padding: 104px 0 88px; }
+.close h2 { font-size: clamp(30px, 4.6vw, 46px); margin-bottom: 18px; }
+.close p { color: var(--muted); max-width: 54ch; margin: 0 auto 32px; }
+.install {
+  display: inline-flex; align-items: center; gap: 14px;
+  font-family: var(--mono); font-size: 15px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 15px 22px; margin-bottom: 22px;
+}
+.install .dollar { color: var(--faint); }
+.zero-dep {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--mono); font-size: 12px; color: var(--safe);
+  border: 1px solid rgba(79,211,154,.3); background: rgba(79,211,154,.07);
+  border-radius: 999px; padding: 7px 15px;
+}
+
+footer {
+  border-top: 1px solid var(--line-soft);
+  padding: 34px 0 46px;
+  display: flex; flex-wrap: wrap; gap: 10px 26px;
+  align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12.5px; color: var(--faint);
+}
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--phantom); }
+
+/* ── Motion ────────────────────────────────────────────────────────────── */
+
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .btn { transition: none; }
+  * { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  section { padding: 68px 0; }
+  .wrap { padding: 0 20px; }
+  .step { grid-template-columns: 46px 1fr; gap: 16px; }
+  .step-num { width: 46px; height: 40px; font-size: 13px; }
+  .step::before { left: 22px; top: 42px; }
+  .term pre { font-size: 11.5px; padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- ── Hero ──────────────────────────────────────────────────────────── -->
+  <header class="hero">
+    <img class="mark" src="assets/logo.png" alt="ghostimport">
+    <h1>Your AI imported a<br><span class="ghosted">package that doesn't exist</span></h1>
+    <p class="lede">
+      Not yet, anyway. The name sits in your repo, unclaimed and public — until someone
+      registers it and your next <strong>npm install</strong> runs their code.
+      <strong>ghostimport</strong> checks names against the live registry the moment your agent writes them.
+    </p>
+
+    <div class="cta-row">
+      <a class="btn primary" href="https://www.npmjs.com/package/ghostimport">npm i -g ghostimport</a>
+      <a class="btn" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
+    </div>
+
+    <div class="term">
+      <div class="term-bar"><i></i><i></i><i></i><span>ghostimport</span></div>
+<pre><span class="d">$</span> <span class="w">ghostimport</span>
+
+  <span class="d">Scanned</span> <span class="p">142 files</span> <span class="d">·</span> <span class="p">38 packages</span>
+
+  <span class="r">✗</span> <span class="w">react-server-fetch</span>  <span class="r">does not exist on npm</span>
+    <span class="d">↳</span> <span class="d">src/data/loader.ts</span>
+    <span class="d">↳</span> <span class="y">unregistered — anyone could claim this name with a malicious postinstall</span>
+
+  <span class="r">✗</span> <span class="w">axois</span>  <span class="r">high risk</span>
+    <span class="d">↳</span> <span class="d">src/api/client.ts</span>
+    <span class="d">↳</span> <span class="y">1-2 chars from 'axios' — likely a typo</span>
+    <span class="d">↳</span> <span class="y">single version published</span>
+    <span class="d">created 2019-08-29 · 1245/week · 1 version</span>
+
+  <span class="r">2 problems found.</span></pre>
+    </div>
+  </header>
+
+  <!-- ── The attack ────────────────────────────────────────────────────── -->
+  <section id="attack">
+    <div class="section-head">
+      <p class="eyebrow">How the attack works</p>
+      <h2>A name is a vacant lot until someone builds on it</h2>
+      <p>
+        This is called <strong style="color:var(--bone)">slopsquatting</strong>. It doesn't need a compromised
+        maintainer or a stolen token — only a package name your AI made up and nobody has claimed.
+      </p>
+    </div>
+
+    <div class="timeline">
+
+      <article class="step reveal">
+        <div class="step-num">1</div>
+        <div>
+          <h3>Your agent invents a dependency</h3>
+          <p>
+            A language model predicts the most likely next token, not the most accurate one. It writes an
+            import for a package that sounds exactly like it should exist — plausible scope, plausible
+            name, plausible API.
+          </p>
+          <span class="pkg phantom">@openai/functions-runtime <span class="tag">unregistered</span></span>
+        </div>
+      </article>
+
+      <article class="step reveal">
+        <div class="step-num">2</div>
+        <div>
+          <h3>The name goes public</h3>
+          <p>
+            You commit. The import is now sitting in a public repository, naming a package that has no
+            owner. Nothing has broken yet — which is exactly the problem, because nothing prompts you
+            to look.
+          </p>
+        </div>
+      </article>
+
+      <article class="step pivot reveal">
+        <div class="step-num">3</div>
+        <div>
+          <h3>Someone claims it</h3>
+          <p>
+            Attackers scrape public repositories for imports that resolve to nothing, then publish those
+            exact names. Registration is free, instant, and requires no interaction with you at all.
+          </p>
+          <span class="pkg claimed">@openai/functions-runtime <span class="tag">published by ???</span></span>
+        </div>
+      </article>
+
+      <article class="step reveal">
+        <div class="step-num">4</div>
+        <div>
+          <h3>The install succeeds</h3>
+          <p>
+            This is the part that makes it dangerous. A hallucinated import that <em>breaks</em> your build is a
+            nuisance — you find out in seconds. This one resolves. It downloads. And a
+            <code style="font-family:var(--mono);font-size:.9em;color:var(--breach)">postinstall</code>
+            script executes on your machine, and on every machine in your CI.
+          </p>
+        </div>
+      </article>
+
+      <article class="step blocked reveal">
+        <div class="step-num">✓</div>
+        <div>
+          <h3>Where ghostimport cuts in</h3>
+          <p>
+            At step one. It resolves every package name your agent writes or installs against the live
+            registry — before the import is committed, and before the install command runs.
+          </p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ── Coverage gap ──────────────────────────────────────────────────── -->
+  <section id="gap">
+    <div class="section-head">
+      <p class="eyebrow">Why your scanner misses it</p>
+      <h2>Audit tools inspect what you installed</h2>
+      <p>
+        npm audit, Snyk and Socket are good at their job. Their job starts once a package is in your
+        lockfile — and a name that doesn't exist yet never gets there.
+      </p>
+    </div>
+
+    <div class="lifecycle">
+      <div class="lifecycle-track">
+        <div class="phase">
+          <div class="phase-label">Agent writes import</div>
+          <div class="phase-when">Now</div>
+        </div>
+        <div class="phase">
+          <div class="phase-label">Install command</div>
+          <div class="phase-when">Seconds later</div>
+        </div>
+        <div class="phase">
+          <div class="phase-label">In the lockfile</div>
+          <div class="phase-when">Committed</div>
+        </div>
+        <div class="phase">
+          <div class="phase-label">Audit / CI</div>
+          <div class="phase-when">Later</div>
+        </div>
+      </div>
+
+      <div class="coverage">
+        <div class="cov-row">
+          <div class="cov-name">npm audit</div>
+          <div class="cov-bar"><div class="cov-fill late">known CVEs, installed packages</div></div>
+        </div>
+        <div class="cov-row">
+          <div class="cov-name">Snyk · Socket</div>
+          <div class="cov-bar"><div class="cov-fill late">behaviour of installed packages</div></div>
+        </div>
+        <div class="cov-row">
+          <div class="cov-name" style="color:var(--safe)">ghostimport</div>
+          <div class="cov-bar"><div class="cov-fill early">does this name exist at all?</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Integrations ──────────────────────────────────────────────────── -->
+  <section id="use">
+    <div class="section-head">
+      <p class="eyebrow">Two ways in</p>
+      <h2>Put it where the code gets written</h2>
+      <p>
+        A CI check tells you about a bad package after it's in your repo. These stop it at the moment
+        it appears. Use both — they cover different failure modes.
+      </p>
+    </div>
+
+    <div class="cards">
+
+      <div class="card lead">
+        <div class="card-role">Enforcing</div>
+        <h3>Agent hooks</h3>
+        <p>
+          Runs on every matching tool call, whether or not the model cooperates. On an install command
+          it <strong style="color:var(--bone)">denies the call outright</strong>.
+        </p>
+<pre><span class="c">// .claude/settings.json</span>
+{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"PreToolUse"</span>: [{
+      <span class="k">"matcher"</span>: <span class="s">"Bash"</span>,
+      <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>,
+        <span class="k">"command"</span>: <span class="s">"ghostimport hook"</span> }]
+    }]
+  }
+}</pre>
+        <ul>
+          <li><strong>PreToolUse on Bash</strong> — vets install commands before they run</li>
+          <li><strong>PostToolUse on edits</strong> — checks imports just written</li>
+          <li><strong>Fails open</strong> — offline or slow, it exits clean and stays out of your way</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-role">Self-service</div>
+        <h3>MCP server</h3>
+        <p>
+          Gives the model the tools to check a name itself, before it commits to writing the import.
+        </p>
+<pre><span class="c"># Claude Code</span>
+claude mcp add ghostimport \
+  -- npx -y ghostimport mcp</pre>
+        <ul>
+          <li><strong>check_packages</strong> — do these names exist?</li>
+          <li><strong>check_install_command</strong> — vet a full install line</li>
+          <li><strong>scan_project</strong> — audit a whole directory</li>
+        </ul>
+        <p style="font-size:14px;color:var(--faint);margin-top:auto">
+          Works with any MCP client — Cursor, Windsurf, Zed.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── Signals ───────────────────────────────────────────────────────── -->
+  <section id="signals">
+    <div class="section-head">
+      <p class="eyebrow">What raises a flag</p>
+      <h2>Existing packages get judged too</h2>
+      <p>
+        A name that resolves isn't automatically safe. <code style="font-family:var(--mono);font-size:.92em;color:var(--phantom)">axois</code>
+        has been on npm since 2019 — one character from <code style="font-family:var(--mono);font-size:.92em;color:var(--phantom)">axios</code>,
+        one version ever published, and roughly 1,245 installs a week. ghostimport rates it high risk
+        and tells you why; what you do about it is your call.
+      </p>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Signal</th><th>Weight</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>postinstall script</td>
+            <td><span class="weight critical">Critical</span></td>
+            <td>Runs arbitrary code the moment the package lands</td>
+          </tr>
+          <tr>
+            <td>1–2 chars from a popular name</td>
+            <td><span class="weight critical">Critical</span></td>
+            <td>The classic typosquat shape</td>
+          </tr>
+          <tr>
+            <td>Created &lt; 30 days ago</td>
+            <td><span class="weight medium">Medium</span></td>
+            <td>No track record to judge it by</td>
+          </tr>
+          <tr>
+            <td>&lt; 50 weekly downloads</td>
+            <td><span class="weight medium">Medium</span></td>
+            <td>Nobody else is depending on this</td>
+          </tr>
+          <tr>
+            <td>Single version published</td>
+            <td><span class="weight medium">Medium</span></td>
+            <td>Abandoned, or published once for a reason</td>
+          </tr>
+          <tr>
+            <td>Single maintainer</td>
+            <td><span class="weight amp">Amplifier</span></td>
+            <td>Only counts alongside another signal — plenty of good packages have one</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── Close ─────────────────────────────────────────────────────────── -->
+  <section class="close">
+    <h2>Check the name before you trust it</h2>
+    <p>One command. Node 22+. Nothing to configure before it's useful.</p>
+
+    <div class="install">
+      <span class="dollar">$</span>
+      <span>npm install -g ghostimport</span>
+    </div>
+
+    <div>
+      <span class="zero-dep">◆ zero runtime dependencies</span>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn" href="https://github.com/FGuerreir0/ghostimport">Read the docs</a>
+      <a class="btn" href="https://www.npmjs.com/package/ghostimport">View on npm</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
+    <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+  </footer>
+
+</div>
+
+<script>
+// Reveal steps as they enter view — the sequence reads better arriving in order
+(function () {
+  var items = document.querySelectorAll('.reveal');
+  if (!('IntersectionObserver' in window) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    items.forEach(function (el) { el.classList.add('in'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add('in');
+      io.unobserve(entry.target);
+    });
+  }, { rootMargin: '0px 0px -12% 0px' });
+  items.forEach(function (el) { io.observe(el); });
+})();
+</script>
+
+</body>
+</html>

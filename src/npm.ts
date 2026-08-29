@@ -1,5 +1,5 @@
 import https from 'https'
-import type { NpmCheckResult, ScaryCheckResult } from './types'
+import type { NpmCheckResult, PackageRiskResult } from './types'
 
 interface VersionMeta {
   scripts?: Record<string, string>
@@ -129,12 +129,13 @@ export function checkNpm(pkgName: string): Promise<NpmCheckResult> {
 
 const INSTALL_HOOKS = new Set(['preinstall', 'install', 'postinstall'])
 
-export async function checkScary(pkgName: string): Promise<ScaryCheckResult> {
+/** Full supply-chain check for one package: registry metadata plus risk heuristics. */
+export async function checkPackageRisk(pkgName: string): Promise<PackageRiskResult> {
   const encoded = encodePackageName(pkgName)
 
   try {
     const meta = await httpGetJson(`https://registry.npmjs.org/${encoded}`) as PackageMeta | null
-    if (!meta) return { exists: false, squatRisk: 'available' }
+    if (!meta) return { exists: false }
 
     const created = meta.time?.created ? new Date(meta.time.created) : null
     const ageMs = created ? Date.now() - created.getTime() : Infinity

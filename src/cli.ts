@@ -4,11 +4,25 @@ import { fileURLToPath } from 'url'
 import { scan } from './scan'
 import { loadConfig } from './config'
 import { CODE_EXTS } from './files'
+import { runMcpServer } from './mcp'
+import { runHook } from './hook'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
   readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'),
 ) as { version: string }
+
+// ─── Subcommands ──────────────────────────────────────────────────────────────
+// Dispatched before flag parsing; each takes over the process entirely.
+
+if (process.argv[2] === 'mcp') {
+  await runMcpServer(version)
+  process.exit(0)
+}
+
+if (process.argv[2] === 'hook') {
+  process.exit(await runHook())
+}
 
 // ─── Minimal color helpers (no dependencies) ─────────────────────────────────
 
@@ -33,7 +47,7 @@ const flags = {
   watch:        args.includes('--watch') || args.includes('-w'),
   noUndeclared: args.includes('--no-undeclared'),
   noCache:      args.includes('--no-cache'),
-  scary:        args.includes('--scary'),
+  fast:         args.includes('--fast'),
   badge:        args.includes('--badge'),
   help:         args.includes('--help') || args.includes('-h'),
   version:      args.includes('--version') || args.includes('-v'),
@@ -46,44 +60,42 @@ if (flags.version) {
 
 if (flags.help) {
   console.log(`
-${c.bold('ghostimport')} — detect hallucinated npm packages in your code
+${c.bold('ghostimport')} — find npm packages your AI wrote that don't exist, or shouldn't be trusted
 
 ${c.bold('Usage:')}
   ghostimport [dir] [options]
+  ghostimport mcp | hook
+
+${c.bold('Commands:')}
+  mcp               Run as an MCP server, so your AI agent can verify a package
+                    before importing it        ${c.gray('claude mcp add ghostimport -- npx -y ghostimport mcp')}
+  hook              Run as an agent hook — blocks installs of packages that
+                    don't exist or look malicious
 
 ${c.bold('Options:')}
-  --quiet, -q       Only show problems (no progress)
+  --quiet, -q       Only show problems
   --json            Output results as JSON
-  --watch, -w       Watch for file changes and re-scan
-  --no-undeclared   Skip "imported but not in package.json" warnings
-  --scary           Check for supply chain attack risk (squatting)
-  --no-cache        Skip the local registry cache
-  --version, -v     Show version
+  --watch, -w       Re-scan on file changes
+  --badge           Print a README badge after scanning
   --help, -h        Show this help
+  --version, -v     Show version
 
-${c.bold('Config:')}
-  Create ${c.cyan('.ghostimportrc.json')} in your project root:
-  {
-    "ignore": ["@company/*", "internal-lib"],
-    "includeUndeclared": true
-  }
+${c.gray('Less common:')}
+  ${c.gray('--fast            Skip the deep supply-chain check on undeclared packages')}
+  ${c.gray('--no-undeclared   Hide "imported but not in package.json" warnings')}
+  ${c.gray('--no-cache        Bypass the 24h registry cache')}
 
-${c.bold('Examples:')}
-  ghostimport                  scan current directory
-  ghostimport ./src            scan specific folder
-  ghostimport --quiet          only show issues
-  ghostimport --scary          check supply chain risk
-  ghostimport --json           machine-readable output
-  ghostimport --badge          print README badge after scan
+${c.bold('Config')} ${c.gray('— optional')} ${c.cyan('.ghostimportrc.json')}${c.gray(' in your project root:')}
+  { "ignore": ["@company/*"], "includeUndeclared": true }
 `)
   process.exit(0)
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
-function badgeMarkdown(hallucinated: number): string {
-  const clean = hallucinated === 0
-  const msg   = clean ? '%E2%9C%93%20clean' : `%F0%9F%91%BB%20${hallucinated}%20ghost${hallucinated > 1 ? 's' : ''}`
+function badgeMarkdown(problems: number): string {
+  const clean = problems === 0
+  const msg   = clean ? '%E2%9C%93%20clean' : `%F0%9F%91%BB%20${problems}%20ghost${problems > 1 ? 's' : ''}`
   const color = clean ? 'brightgreen' : 'red'
   const url   = `https://img.shields.io/badge/ghostimport-${msg}-${color}`
   return `[![ghostimport](${url})](https://github.com/FGuerreir0/ghostimport)`
@@ -97,26 +109,29 @@ async function runScan() {
   if (!flags.quiet && !flags.json) {
     console.log(`\n${c.bold('ghostimport')} ${c.gray(`v${version}`)}`)
     console.log(c.gray(`Scanning ${targetDir}`))
-    if (flags.scary) console.log(c.magenta('  ⚠  Scary mode: checking supply chain risk'))
     console.log()
   }
 
   let lastProgress = ''
 
-  const results = await scan(targetDir, {
-  useCache: !flags.noCache,
-  scary: flags.scary,
-  config,
-  onProgress: flags.json || flags.quiet ? undefined : ({ pkg, done, total }) => {
-    const pct = Math.round((done / total) * 100)
-    const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5))
-    const line = `  ${c.gray(bar)} ${pct}%  ${c.dim(pkg.slice(0, 30))}`
-    process.stdout.write('\r' + line + ' '.repeat(Math.max(0, lastProgress.length - line.length)))
-    lastProgress = line
-  },
-})
+  // \r only redraws on a terminal; piping to a file or a CI log would otherwise
+  // accumulate every progress frame as literal output
+  const showProgress = !flags.json && !flags.quiet && process.stdout.isTTY
 
-  if (!flags.json && !flags.quiet && lastProgress) {
+  const results = await scan(targetDir, {
+    useCache: !flags.noCache,
+    deep: !flags.fast,
+    config,
+    onProgress: !showProgress ? undefined : ({ pkg, done, total }) => {
+      const pct = Math.round((done / total) * 100)
+      const bar = '█'.repeat(Math.floor(pct / 5)) + '░'.repeat(20 - Math.floor(pct / 5))
+      const line = `  ${c.gray(bar)} ${pct}%  ${c.dim(pkg.slice(0, 30))}`
+      process.stdout.write('\r' + line + ' '.repeat(Math.max(0, lastProgress.length - line.length)))
+      lastProgress = line
+    },
+  })
+
+  if (showProgress && lastProgress) {
     process.stdout.write('\r' + ' '.repeat(lastProgress.length + 5) + '\r')
   }
 
@@ -124,115 +139,84 @@ async function runScan() {
 
   if (flags.json) {
     console.log(JSON.stringify(results, null, 2))
-    return results.hallucinated.length
+    return results.missing.length
   }
 
   // ─── Human output ────────────────────────────────────────────────────────────
+  //
+  // One list, worst first. Every problem is a package name with its reasons
+  // underneath — the previous four-section layout made readers reassemble the
+  // story for a single package from findings scattered across the output.
 
-  const totalIssues = results.hallucinated.length +
-    (flags.noUndeclared ? 0 : results.notInPackageJson.length)
+  const riskFor = new Map(results.risks.map(r => [r.pkg, r]))
 
   console.log(
     `  ${c.gray('Scanned')} ${c.cyan(results.scanned + ' files')}` +
-    ` · ${c.cyan(results.packages + ' unique packages')} checked` +
-    (results.cacheHits > 0 ? ` ${c.gray(`(${results.cacheHits} cached)`)}` : '') +
-    '\n',
+    ` · ${c.cyan(results.packages + ' packages')}` +
+    (results.cacheHits > 0 ? ` ${c.gray(`(${results.cacheHits} cached)`)}` : ''),
   )
-
-  // ── Hallucinated packages ────────────────────────────────────────────────────
-  if (results.hallucinated.length === 0) {
-    console.log(c.green('  ✓ No hallucinated packages found'))
-  } else {
-    console.log(c.bold(c.red(`  ✗ ${results.hallucinated.length} hallucinated package${results.hallucinated.length > 1 ? 's' : ''} (do not exist on npm):\n`)))
-    for (const { pkg, files } of results.hallucinated) {
-      console.log(`  ${c.red('●')} ${c.bold(pkg)}`)
-      for (const f of files.slice(0, 3)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
-      if (files.length > 3) console.log(`    ${c.gray(`↳ ...and ${files.length - 3} more files`)}`)
-    }
-  }
-
-  // ── Scary mode output ────────────────────────────────────────────────────────
-  if (flags.scary && results.scary.length > 0) {
-    console.log()
-    const available = results.scary.filter(s => s.type === 'available')
-    const suspicious = results.scary.filter(s => s.type === 'suspicious')
-
-    if (available.length > 0) {
-      console.log(c.bold(c.magenta(`  💀 ${available.length} package name${available.length > 1 ? 's' : ''} available for malicious registration:\n`)))
-      for (const entry of available) {
-        console.log(`  ${c.magenta('●')} ${c.bold(entry.pkg)}`)
-        if (entry.typosquatOf) {
-          console.log(`    ${c.red(`↳ TYPOSQUAT: 1-2 chars away from '${entry.typosquatOf}' — classic squatting pattern`)}`)
-        }
-        console.log(`    ${c.red('↳ Anyone can register this name with a malicious postinstall script')}`)
-        console.log(`    ${c.red('↳ If installed, it could exfiltrate .env, tokens, SSH keys')}`)
-      }
-    }
-
-    if (suspicious.length > 0) {
-      console.log()
-      console.log(c.bold(c.magenta(`  🕵️  ${suspicious.length} suspicious package${suspicious.length > 1 ? 's' : ''} (potential squats):\n`)))
-      for (const entry of suspicious) {
-        if (entry.type !== 'suspicious') continue
-        const riskColor = entry.risk === 'high' ? c.red : c.yellow
-        console.log(`  ${riskColor('●')} ${c.bold(entry.pkg)} ${c.gray(`[${entry.risk} risk]`)}`)
-        if (entry.installScripts.length > 0) {
-          console.log(`    ${c.red(`↳ CRITICAL: has ${entry.installScripts.join(', ')} hook — executes code on npm install`)}`)
-        }
-        if (entry.typosquatOf) {
-          console.log(`    ${c.red(`↳ TYPOSQUAT: 1-2 chars away from '${entry.typosquatOf}'`)}`)
-        }
-        if (entry.maintainers === 1) {
-          console.log(`    ${c.yellow('↳ single maintainer')}`)
-        }
-        const otherFlags = entry.flags.filter(f =>
-          !f.startsWith('has ') && !f.startsWith('name is') && f !== 'single maintainer'
-        )
-        for (const flag of otherFlags) console.log(`    ${c.yellow('↳')} ${flag}`)
-        console.log(c.gray(`    created ${entry.created} · ${entry.downloads ?? '?'} downloads/week · ${entry.versions} version${entry.versions !== 1 ? 's' : ''}`))
-      }
-    }
-  }
-
-  // ── Not in package.json ──────────────────────────────────────────────────────
-  if (!flags.noUndeclared && results.notInPackageJson.length > 0) {
-    console.log()
-    console.log(c.bold(c.yellow(`  ⚠  ${results.notInPackageJson.length} package${results.notInPackageJson.length > 1 ? 's' : ''} imported but missing from package.json:\n`)))
-    for (const { pkg, files } of results.notInPackageJson.slice(0, 10)) {
-      console.log(`  ${c.yellow('●')} ${c.bold(pkg)}`)
-      for (const f of files.slice(0, 2)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
-    }
-    if (results.notInPackageJson.length > 10) {
-      console.log(`  ${c.gray(`  ...and ${results.notInPackageJson.length - 10} more`)}`)
-    }
-  }
-
-  // ── Errors ───────────────────────────────────────────────────────────────────
-  if (results.errors.length > 0) {
-    console.log()
-    console.log(c.gray(`  ⚡ ${results.errors.length} package(s) could not be checked (network/timeout)`))
-  }
-
-  // ── Final verdict ─────────────────────────────────────────────────────────────
   console.log()
-  if (totalIssues === 0 && results.scary.length === 0) {
-    console.log(c.green(c.bold('  All good! ✓\n')))
-  } else if (flags.scary && results.scary.length > 0) {
-    const scaryCount = results.scary.filter(s => s.type === 'available').length
-    console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''} · ${scaryCount} supply chain risk${scaryCount > 1 ? 's' : ''}\n`)))
+
+  const problems = [
+    ...results.missing.map(p => ({ ...p, kind: 'missing' as const })),
+    ...results.undeclared
+      .filter(p => riskFor.get(p.pkg)?.type === 'suspicious')
+      .map(p => ({ ...p, kind: 'risky' as const })),
+  ]
+
+  for (const problem of problems) {
+    const risk = riskFor.get(problem.pkg)
+    const label = problem.kind === 'missing'
+      ? c.red('does not exist on npm')
+      : c.red(`${risk?.type === 'suspicious' ? risk.risk : 'high'} risk`)
+
+    console.log(`  ${c.red('✗')} ${c.bold(problem.pkg)}  ${label}`)
+
+    for (const f of problem.files.slice(0, 3)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
+    if (problem.files.length > 3) console.log(`    ${c.gray(`↳ +${problem.files.length - 3} more files`)}`)
+
+    if (risk?.typosquatOf) {
+      console.log(`    ${c.gray('↳')} ${c.yellow(`1-2 chars from '${risk.typosquatOf}' — likely a typo`)}`)
+    }
+    if (risk?.type === 'unregistered') {
+      console.log(`    ${c.gray('↳')} ${c.yellow('unregistered — anyone could claim this name with a malicious postinstall')}`)
+    }
+    if (risk?.type === 'suspicious') {
+      if (risk.installScripts.length > 0) {
+        console.log(`    ${c.gray('↳')} ${c.yellow(`has ${risk.installScripts.join('/')} script — runs code on npm install`)}`)
+      }
+      const rest = risk.flags.filter(f => !f.startsWith('has ') && !f.startsWith('name is'))
+      for (const flag of rest) console.log(`    ${c.gray('↳')} ${c.yellow(flag)}`)
+      console.log(`    ${c.gray(`created ${risk.created} · ${risk.downloads ?? '?'}/week · ${risk.versions} version${risk.versions !== 1 ? 's' : ''}`)}`)
+    }
+    console.log()
+  }
+
+  // Undeclared-but-safe packages are a tidiness issue, not a security one —
+  // collapsed to a single line so they never crowd out real findings.
+  const tidy = results.undeclared.filter(p => riskFor.get(p.pkg)?.type !== 'suspicious')
+  if (!flags.noUndeclared && tidy.length > 0) {
+    const names = tidy.slice(0, 8).map(p => p.pkg).join(', ')
+    const more = tidy.length > 8 ? `, +${tidy.length - 8} more` : ''
+    console.log(`  ${c.yellow('⚠')} ${c.gray('not in package.json:')} ${names}${more}\n`)
+  }
+
+  if (results.errors.length > 0) {
+    console.log(c.gray(`  · ${results.errors.length} package(s) could not be checked (network)\n`))
+  }
+
+  if (problems.length === 0) {
+    console.log(c.green(c.bold('  No problems found ✓\n')))
   } else {
-    console.log(c.red(c.bold(`  Found ${totalIssues} issue${totalIssues > 1 ? 's' : ''}.\n`)))
+    console.log(c.red(c.bold(`  ${problems.length} problem${problems.length > 1 ? 's' : ''} found.\n`)))
   }
 
   if (flags.badge) {
-    const badge = badgeMarkdown(results.hallucinated.length)
-    console.log(c.gray('  ─────────────────────────────────────────────────────────'))
-    console.log(c.bold('  README badge (paste into your README.md):\n'))
-    console.log(`  ${badge}`)
-    console.log(c.gray('  ─────────────────────────────────────────────────────────\n'))
+    console.log(c.gray('  README badge:'))
+    console.log(`  ${badgeMarkdown(problems.length)}\n`)
   }
 
-  return results.hallucinated.length
+  return results.missing.length
 }
 
 // ─── Execute ──────────────────────────────────────────────────────────────────
