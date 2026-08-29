@@ -3,68 +3,100 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ghostimport — the package that wasn't there</title>
-<meta name="description" content="Your AI writes an import for a package that doesn't exist. An attacker registers the name. ghostimport blocks the install before that happens.">
+<title>ghostimport — Stop AI Installing npm Packages That Don't Exist</title>
+<meta name="description" content="Your AI invents an npm package name; an attacker registers it. ghostimport blocks the install first — slopsquatting protection via MCP server and agent hooks.">
+<meta name="keywords" content="slopsquatting, hallucinated npm package, npm typosquatting, AI supply chain security, MCP server, Claude Code hooks">
+<meta name="author" content="Fábio Guerreiro">
 <meta name="google-site-verification" content="UMRxCizH2KE1-fE49BbHXKlj1Xx9mJC3V5qICsbvQDM">
 <link rel="icon" href="assets/logo.png">
 <link rel="canonical" href="https://fguerreir0.github.io/ghostimport/">
 <!-- Social cards need absolute URLs — Twitter and Slack drop relative og:image -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://fguerreir0.github.io/ghostimport/">
-<meta property="og:title" content="ghostimport">
-<meta property="og:description" content="Stops your AI coding agent from installing npm packages that don't exist.">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:title" content="ghostimport — Stop AI Installing npm Packages That Don't Exist">
+<meta property="og:description" content="Your AI invents an npm package name; an attacker registers it. ghostimport blocks the install first.">
 <meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta property="og:image:alt" content="The ghostimport logo: a ghost drawn with a dashed outline">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="ghostimport">
-<meta name="twitter:description" content="Stops your AI coding agent from installing npm packages that don't exist.">
+<meta name="twitter:title" content="ghostimport — Stop AI Installing npm Packages That Don't Exist">
+<meta name="twitter:description" content="Your AI invents an npm package name; an attacker registers it. ghostimport blocks the install first.">
 <meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+
+<!-- Structured data. No aggregateRating — inventing review counts is a manual-action risk. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "ghostimport",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Node.js 22+",
+      "url": "https://fguerreir0.github.io/ghostimport/",
+      "description": "Detects npm packages that do not exist — hallucinated by AI coding tools — and blocks agents from installing them. Guards against slopsquatting and typosquatting supply-chain attacks.",
+      "downloadUrl": "https://www.npmjs.com/package/ghostimport",
+      "codeRepository": "https://github.com/FGuerreir0/ghostimport",
+      "programmingLanguage": "TypeScript",
+      "license": "https://opensource.org/licenses/MIT",
+      "author": { "@type": "Person", "name": "Fábio Guerreiro" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is slopsquatting?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Slopsquatting is when an attacker registers an npm package name that an AI coding tool invented. Language models routinely generate imports for packages that were never published. Those names sit unclaimed in public repositories, so an attacker can publish them and have their code run on any machine that installs the dependency."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does npm audit catch hallucinated packages?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. npm audit, Snyk and Socket inspect packages that are already installed and present in your lockfile. A package name that does not exist yet never reaches the lockfile, so it falls outside what those tools examine."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is slopsquatting different from typosquatting?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Typosquatting relies on a human mistyping a real package name. Slopsquatting relies on an AI model inventing a name that was never real, then an attacker registering it. Typosquatting needs a plausible misspelling; slopsquatting needs only an unclaimed name that a model is likely to produce again."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is an import of a package that does not exist actually dangerous?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Not while the name stays unregistered — the install simply fails. The risk is that registration is free and instant. Once someone claims the name, the same install succeeds and any postinstall script in that package executes on your machine and in your CI."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I stop my AI agent from installing a package that does not exist?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Run ghostimport as an agent hook. A PreToolUse hook on Bash inspects any npm, pnpm, yarn or bun install command and denies the tool call when a package does not exist, is a typosquat, or ships an install script. Unlike an MCP tool, a hook runs whether or not the model chooses to call it."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="assets/site.css">
 <style>
-/* ── Tokens ─────────────────────────────────────────────────────────────────
-   Dark-committed: this is a terminal-native security tool and the logo already
-   lives on a dark ground. Every colour is painted explicitly so the page holds
-   on any host background. */
-:root {
-  color-scheme: dark;
-
-  --void:      #0d0d16;
-  --surface:   #14141f;
-  --raised:    #1b1b28;
-  --line:      #262636;
-  --line-soft: #1e1e2c;
-
-  --phantom:   #a8a8f0;
-  --phantom-d: #8080dc;
-  --bone:      #e9e9f3;
-  --muted:     #7d7d95;
-  --faint:     #55556b;
-
-  --breach:    #ff5f56;
-  --breach-dim:#3a1d20;
-  --safe:      #4fd39a;
-  --warn:      #e8b464;
-
-  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
-  --body:    'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
-  --mono:    'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
-
-  --page:  1080px;
-  --prose: 62ch;
-}
-
-*, *::before, *::after { box-sizing: border-box; }
-
-body {
-  margin: 0;
-  background: var(--void);
-  color: var(--bone);
-  font-family: var(--body);
-  font-size: 17px;
-  line-height: 1.65;
-  -webkit-font-smoothing: antialiased;
-}
+/* Landing-page layout only. Tokens, base type, buttons, terminal, tables,
+   footer and motion live in assets/site.css and are shared with the docs. */
 
 /* Ambient: a faint spectral wash behind the fold, nothing more */
 body::before {
@@ -75,25 +107,6 @@ body::before {
   background: radial-gradient(60% 60% at 50% 0%, rgba(168,168,240,.10), transparent 70%);
   pointer-events: none;
   z-index: 0;
-}
-
-.wrap { position: relative; z-index: 1; max-width: var(--page); margin: 0 auto; padding: 0 28px; }
-
-a { color: var(--phantom); text-decoration-color: rgba(168,168,240,.35); text-underline-offset: 3px; }
-a:hover { text-decoration-color: var(--phantom); }
-:focus-visible { outline: 2px solid var(--phantom); outline-offset: 3px; border-radius: 3px; }
-
-h1, h2, h3 { font-family: var(--display); font-weight: 700; text-wrap: balance; margin: 0; line-height: 1.12; letter-spacing: -0.02em; }
-
-/* Eyebrows mark section role, not decoration */
-.eyebrow {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .18em;
-  text-transform: uppercase;
-  color: var(--phantom-d);
-  margin: 0 0 14px;
 }
 
 section { padding: 96px 0; border-top: 1px solid var(--line-soft); }
@@ -119,87 +132,24 @@ section:first-of-type { border-top: 0; }
   padding: 0 .18em;
   /* the dashed rule is the whole thesis: a name with nothing behind it */
 }
-.hero .lede {
-  max-width: 60ch;
-  margin: 0 auto;
-  color: var(--muted);
-  font-size: clamp(17px, 2vw, 19px);
-}
+.hero .lede { max-width: 60ch; margin: 0 auto; color: var(--muted); font-size: clamp(17px, 2vw, 19px); }
 .hero .lede strong { color: var(--bone); font-weight: 600; }
-
-.cta-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 34px; }
-.btn {
-  display: inline-flex; align-items: center; gap: 9px;
-  font-family: var(--mono); font-size: 14px; font-weight: 500;
-  padding: 12px 20px; border-radius: 9px; text-decoration: none;
-  border: 1px solid var(--line); color: var(--bone); background: var(--raised);
-  transition: border-color .18s, background .18s, transform .18s;
-}
-.btn:hover { border-color: var(--phantom-d); background: #21212f; transform: translateY(-1px); }
-.btn.primary { background: var(--phantom); color: #14141f; border-color: var(--phantom); font-weight: 700; }
-.btn.primary:hover { background: #b8b8f5; border-color: #b8b8f5; }
-
-/* ── Terminal ──────────────────────────────────────────────────────────── */
-
-.term {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  overflow: hidden;
-  text-align: left;
-  box-shadow: 0 24px 60px -28px rgba(0,0,0,.9);
-}
-.term-bar {
-  display: flex; align-items: center; gap: 8px;
-  padding: 11px 15px;
-  border-bottom: 1px solid var(--line);
-  background: #10101a;
-}
-.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); display: block; }
-.term-bar i:first-child { background: #46464f; }
-.term-bar span { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: 8px; }
-.term pre {
-  margin: 0; padding: 22px;
-  font-family: var(--mono); font-size: 13px; line-height: 1.72;
-  overflow-x: auto; color: #b9b9cc;
-}
-.term .p  { color: var(--phantom); }
-.term .r  { color: var(--breach); font-weight: 500; }
-.term .g  { color: var(--safe); }
-.term .y  { color: var(--warn); }
-.term .d  { color: var(--faint); }
-.term .w  { color: var(--bone); font-weight: 500; }
-
+.hero .cta-row, .close .cta-row { justify-content: center; margin-top: 34px; }
 .hero .term { max-width: 780px; margin: 46px auto 0; }
 
 /* ── Attack timeline ───────────────────────────────────────────────────── */
 
-.timeline { display: grid; gap: 0; counter-reset: step; }
-
-.step {
-  display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: 26px;
-  padding-bottom: 44px;
-  position: relative;
-}
+.timeline { display: grid; gap: 0; }
+.step { display: grid; grid-template-columns: 64px 1fr; gap: 26px; padding-bottom: 44px; position: relative; }
 .step::before {
   /* the thread running through the sequence */
-  content: "";
-  position: absolute;
-  left: 31px; top: 46px; bottom: -6px;
-  width: 2px;
-  background: var(--line);
+  content: ""; position: absolute; left: 31px; top: 46px; bottom: -6px; width: 2px; background: var(--line);
 }
 .step:last-child::before { display: none; }
 .step-num {
-  width: 64px; height: 46px;
-  display: grid; place-items: center;
-  font-family: var(--mono); font-size: 15px; font-weight: 700;
-  color: var(--faint);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
+  width: 64px; height: 46px; display: grid; place-items: center;
+  font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--faint);
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
 }
 .step h3 { font-size: 20px; margin-bottom: 8px; }
 .step p { margin: 0; color: var(--muted); max-width: 56ch; font-size: 16px; }
@@ -209,29 +159,20 @@ section:first-of-type { border-top: 0; }
 .step.pivot .step-num { color: var(--breach); border-color: var(--breach); background: var(--breach-dim); }
 .step.pivot::before { background: linear-gradient(var(--breach), var(--line)); }
 .step.pivot h3 { color: var(--breach); }
-
 .step.blocked .step-num { color: var(--safe); border-color: var(--safe); background: #14291f; }
 .step.blocked h3 { color: var(--safe); }
 
 .pkg {
   display: inline-flex; align-items: center; gap: 8px;
-  font-family: var(--mono); font-size: 13px;
-  padding: 5px 11px; border-radius: 7px;
-  margin-top: 14px;
+  font-family: var(--mono); font-size: 13px; padding: 5px 11px; border-radius: 7px; margin-top: 14px;
 }
 .pkg.phantom { border: 1.5px dashed var(--phantom-d); color: var(--phantom); background: rgba(168,168,240,.05); }
-.pkg.claimed { border: 1.5px solid var(--breach);   color: var(--breach);  background: var(--breach-dim); }
+.pkg.claimed { border: 1.5px solid var(--breach); color: var(--breach); background: var(--breach-dim); }
 .pkg .tag { font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
 
 /* ── Coverage gap ──────────────────────────────────────────────────────── */
 
-.lifecycle {
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: var(--surface);
-  padding: 30px;
-  overflow-x: auto;
-}
+.lifecycle { border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 30px; overflow-x: auto; }
 .lifecycle-track { display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 0; min-width: 620px; }
 .phase { padding: 0 16px; border-left: 1px solid var(--line); }
 .phase:first-child { border-left: 0; padding-left: 0; }
@@ -242,67 +183,36 @@ section:first-of-type { border-top: 0; }
 .cov-row { display: grid; grid-template-columns: 148px 1fr; align-items: center; gap: 16px; }
 .cov-name { font-family: var(--mono); font-size: 13px; color: var(--muted); }
 .cov-bar { position: relative; height: 34px; border-radius: 8px; background: #10101a; border: 1px solid var(--line-soft); overflow: hidden; }
-.cov-fill {
-  position: absolute; top: 0; bottom: 0;
-  display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
-}
-.cov-fill.late  { left: 50%;  right: 0; background: rgba(125,125,149,.16); color: var(--muted); }
-.cov-fill.early { left: 0;    right: 25%; background: rgba(79,211,154,.14); color: var(--safe); border-right: 1.5px solid var(--safe); }
+.cov-fill { position: absolute; top: 0; bottom: 0; display: grid; place-items: center; font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.cov-fill.late  { left: 50%; right: 0; background: rgba(125,125,149,.16); color: var(--muted); }
+.cov-fill.early { left: 0; right: 25%; background: rgba(79,211,154,.14); color: var(--safe); border-right: 1.5px solid var(--safe); }
 
 /* ── Integration cards ─────────────────────────────────────────────────── */
 
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 22px; }
-.card {
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: var(--surface);
-  padding: 28px;
-  display: flex; flex-direction: column; gap: 14px;
-}
+.card { border: 1px solid var(--line); border-radius: 13px; background: var(--surface); padding: 28px; display: flex; flex-direction: column; gap: 14px; }
 .card.lead { border-color: var(--phantom-d); box-shadow: 0 0 0 1px rgba(168,168,240,.16); }
-.card-role {
-  font-family: var(--mono); font-size: 11px; font-weight: 700;
-  letter-spacing: .14em; text-transform: uppercase;
-}
+.card-role { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
 .card.lead .card-role { color: var(--phantom); }
 .card:not(.lead) .card-role { color: var(--faint); }
 .card h3 { font-size: 22px; }
 .card > p { margin: 0; color: var(--muted); font-size: 16px; }
 .card pre {
-  margin: 4px 0 0; padding: 16px;
-  background: #10101a; border: 1px solid var(--line-soft); border-radius: 9px;
-  font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
-  overflow-x: auto; color: #b9b9cc;
+  margin: 4px 0 0; padding: 16px; background: #10101a;
+  border: 1px solid var(--line-soft); border-radius: 9px;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6; overflow-x: auto; color: #b9b9cc;
 }
-.card pre .k { color: var(--phantom); }
-.card pre .s { color: var(--safe); }
-.card pre .c { color: var(--faint); }
 .card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 15px; }
 .card li { margin-bottom: 6px; }
 .card li strong { color: var(--bone); font-weight: 600; }
 
-/* ── Signals table ─────────────────────────────────────────────────────── */
+/* ── FAQ ───────────────────────────────────────────────────────────────── */
 
-.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
-table { border-collapse: collapse; width: 100%; min-width: 560px; }
-th, td { text-align: left; padding: 15px 22px; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
-tbody tr:last-child td { border-bottom: 0; }
-th {
-  font-family: var(--mono); font-size: 11px; font-weight: 700;
-  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
-  background: #10101a;
-}
-td:first-child { font-family: var(--mono); font-size: 13px; color: var(--bone); }
-td:last-child { color: var(--muted); }
-.weight {
-  font-family: var(--mono); font-size: 11px; font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase;
-  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
-}
-.weight.critical { color: var(--breach); background: var(--breach-dim); }
-.weight.medium   { color: var(--warn);   background: #33270f; }
-.weight.amp      { color: var(--muted);  background: #1e1e2c; }
+.faq { display: grid; gap: 0; }
+.faq-item { padding: 24px 0; border-top: 1px solid var(--line-soft); }
+.faq-item:first-child { border-top: 0; padding-top: 0; }
+.faq-item h3 { font-size: 19px; margin-bottom: 10px; }
+.faq-item p { margin: 0; color: var(--muted); max-width: var(--prose); font-size: 16px; }
 
 /* ── Closing ───────────────────────────────────────────────────────────── */
 
@@ -323,35 +233,11 @@ td:last-child { color: var(--muted); }
   border-radius: 999px; padding: 7px 15px;
 }
 
-footer {
-  border-top: 1px solid var(--line-soft);
-  padding: 34px 0 46px;
-  display: flex; flex-wrap: wrap; gap: 10px 26px;
-  align-items: center; justify-content: center;
-  font-family: var(--mono); font-size: 12.5px; color: var(--faint);
-}
-footer a { color: var(--muted); text-decoration: none; }
-footer a:hover { color: var(--phantom); }
-
-/* ── Motion ────────────────────────────────────────────────────────────── */
-
-.reveal { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
-.reveal.in { opacity: 1; transform: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  .reveal { opacity: 1; transform: none; transition: none; }
-  .btn { transition: none; }
-  * { animation: none !important; }
-}
-
 @media (max-width: 640px) {
-  body { font-size: 16px; }
   section { padding: 68px 0; }
-  .wrap { padding: 0 20px; }
   .step { grid-template-columns: 46px 1fr; gap: 16px; }
   .step-num { width: 46px; height: 40px; font-size: 13px; }
   .step::before { left: 22px; top: 42px; }
-  .term pre { font-size: 11.5px; padding: 16px; }
 }
 </style>
 </head>
@@ -370,7 +256,7 @@ footer a:hover { color: var(--phantom); }
     </p>
 
     <div class="cta-row">
-      <a class="btn primary" href="https://www.npmjs.com/package/ghostimport">npm i -g ghostimport</a>
+      <a class="btn primary" href="docs/">Get started</a>
       <a class="btn" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
     </div>
 
@@ -632,6 +518,65 @@ claude mcp add ghostimport \
     </div>
   </section>
 
+  <!-- ── FAQ ───────────────────────────────────────────────────────────── -->
+  <section id="faq">
+    <div class="section-head">
+      <p class="eyebrow">Questions</p>
+      <h2>Common questions</h2>
+    </div>
+
+    <div class="faq">
+      <div class="faq-item">
+        <h3>What is slopsquatting?</h3>
+        <p>
+          Slopsquatting is when an attacker registers an npm package name that an AI coding tool
+          invented. Language models routinely generate imports for packages that were never
+          published. Those names sit unclaimed in public repositories, so an attacker can publish
+          them and have their code run on any machine that installs the dependency.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Does npm audit catch hallucinated packages?</h3>
+        <p>
+          No. npm audit, Snyk and Socket inspect packages that are already installed and present in
+          your lockfile. A package name that doesn't exist yet never reaches the lockfile, so it
+          falls outside what those tools examine.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How is slopsquatting different from typosquatting?</h3>
+        <p>
+          Typosquatting relies on a human mistyping a real package name. Slopsquatting relies on a
+          model inventing a name that was never real, then an attacker registering it. Typosquatting
+          needs a plausible misspelling; slopsquatting needs only an unclaimed name a model is
+          likely to produce again.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Is an import of a package that doesn't exist actually dangerous?</h3>
+        <p>
+          Not while the name stays unregistered — the install simply fails. The risk is that
+          registration is free and instant. Once someone claims the name, that same install
+          succeeds, and any <code>postinstall</code> script in the package executes on your machine
+          and in your CI.
+        </p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How do I stop my AI agent from installing a package that doesn't exist?</h3>
+        <p>
+          Run ghostimport as an <a href="docs/#hooks">agent hook</a>. A <code>PreToolUse</code> hook
+          on Bash inspects any install command and denies the tool call when a package doesn't
+          exist, is a typosquat, or ships an install script. Unlike an MCP tool, a hook runs whether
+          or not the model chooses to call it.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Close ─────────────────────────────────────────────────────────── -->
   <section class="close">
     <h2>Check the name before you trust it</h2>
@@ -647,13 +592,14 @@ claude mcp add ghostimport \
     </div>
 
     <div class="cta-row">
-      <a class="btn" href="https://github.com/FGuerreir0/ghostimport">Read the docs</a>
+      <a class="btn primary" href="docs/">Read the docs</a>
       <a class="btn" href="https://www.npmjs.com/package/ghostimport">View on npm</a>
     </div>
   </section>
 
   <footer>
     <span>MIT licensed</span>
+    <a href="docs/">Docs</a>
     <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
     <a href="https://www.npmjs.com/package/ghostimport">npm</a>
   </footer>

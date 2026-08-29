@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://fguerreir0.github.io/ghostimport/sitemap.xml

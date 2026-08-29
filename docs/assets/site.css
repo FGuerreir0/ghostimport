@@ -1,0 +1,191 @@
+/* ── ghostimport design system ───────────────────────────────────────────────
+   Shared by every page on the site. Page-specific layout stays inline in each
+   page; anything that defines the identity lives here so the pages can't drift.
+
+   Dark-committed: this is a terminal-native security tool and the logo already
+   lives on a dark ground. Every colour is painted explicitly so the page holds
+   on any host background.
+
+   Motif worth preserving: a DASHED border means a package name nobody owns,
+   a SOLID border means a real published package.
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  color-scheme: dark;
+
+  --void:      #0d0d16;
+  --surface:   #14141f;
+  --raised:    #1b1b28;
+  --line:      #262636;
+  --line-soft: #1e1e2c;
+
+  --phantom:   #a8a8f0;
+  --phantom-d: #8080dc;
+  --bone:      #e9e9f3;
+  --muted:     #7d7d95;
+  --faint:     #55556b;
+
+  --breach:    #ff5f56;
+  --breach-dim:#3a1d20;
+  --safe:      #4fd39a;
+  --warn:      #e8b464;
+
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --body:    'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+
+  --page:  1080px;
+  --prose: 62ch;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--bone);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { position: relative; z-index: 1; max-width: var(--page); margin: 0 auto; padding: 0 28px; }
+
+a { color: var(--phantom); text-decoration-color: rgba(168,168,240,.35); text-underline-offset: 3px; }
+a:hover { text-decoration-color: var(--phantom); }
+:focus-visible { outline: 2px solid var(--phantom); outline-offset: 3px; border-radius: 3px; }
+
+h1, h2, h3, h4 {
+  font-family: var(--display);
+  font-weight: 700;
+  text-wrap: balance;
+  margin: 0;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+/* Eyebrows mark section role, not decoration */
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--phantom-d);
+  margin: 0 0 14px;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: .9em;
+  color: var(--phantom);
+  background: rgba(168,168,240,.08);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 9px;
+  font-family: var(--mono); font-size: 14px; font-weight: 500;
+  padding: 12px 20px; border-radius: 9px; text-decoration: none;
+  border: 1px solid var(--line); color: var(--bone); background: var(--raised);
+  transition: border-color .18s, background .18s, transform .18s;
+}
+.btn:hover { border-color: var(--phantom-d); background: #21212f; transform: translateY(-1px); }
+.btn.primary { background: var(--phantom); color: #14141f; border-color: var(--phantom); font-weight: 700; }
+.btn.primary:hover { background: #b8b8f5; border-color: #b8b8f5; }
+
+/* ── Terminal / code blocks ──────────────────────────────────────────────── */
+
+.term {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  overflow: hidden;
+  text-align: left;
+  box-shadow: 0 24px 60px -28px rgba(0,0,0,.9);
+}
+.term-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 15px;
+  border-bottom: 1px solid var(--line);
+  background: #10101a;
+}
+.term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--line); display: block; }
+.term-bar i:first-child { background: #46464f; }
+.term-bar span { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-left: 8px; }
+.term pre {
+  margin: 0; padding: 22px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.72;
+  overflow-x: auto; color: #b9b9cc;
+}
+
+/* Syntax roles, shared by terminal output and config samples */
+.p { color: var(--phantom); }
+.r { color: var(--breach); font-weight: 500; }
+.g { color: var(--safe); }
+.y { color: var(--warn); }
+.d { color: var(--faint); }
+.w { color: var(--bone); font-weight: 500; }
+.k { color: var(--phantom); }
+.s { color: var(--safe); }
+.c { color: var(--faint); }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 520px; }
+th, td { text-align: left; padding: 14px 20px; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+tbody tr:last-child td { border-bottom: 0; }
+th {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--faint);
+  background: #10101a;
+}
+td:first-child { font-family: var(--mono); font-size: 13px; color: var(--bone); }
+td:last-child { color: var(--muted); }
+td code { background: none; border: 0; padding: 0; }
+
+/* Risk weight pills — used on the landing page and in the docs */
+.weight {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 5px; white-space: nowrap;
+}
+.weight.critical { color: var(--breach); background: var(--breach-dim); }
+.weight.medium   { color: var(--warn);   background: #33270f; }
+.weight.amp      { color: var(--muted);  background: #1e1e2c; }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+footer {
+  border-top: 1px solid var(--line-soft);
+  padding: 34px 0 46px;
+  display: flex; flex-wrap: wrap; gap: 10px 26px;
+  align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 12.5px; color: var(--faint);
+}
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--phantom); }
+
+/* ── Motion ──────────────────────────────────────────────────────────────── */
+
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .55s ease, transform .55s ease; }
+.reveal.in { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .btn { transition: none; }
+  * { animation: none !important; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 16px; }
+  .wrap { padding: 0 20px; }
+  .term pre { font-size: 11.5px; padding: 16px; }
+}

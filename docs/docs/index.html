@@ -1,0 +1,806 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ghostimport Docs — CLI, Agent Hooks &amp; MCP Server Setup</title>
+<meta name="description" content="Set up ghostimport: install, Claude Code hooks that block malicious npm installs, MCP config for Cursor and Windsurf, plus CLI flags, config file and API.">
+<meta name="author" content="Fábio Guerreiro">
+<link rel="icon" href="../assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/docs/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/docs/">
+<meta property="og:title" content="ghostimport Docs — CLI, Agent Hooks &amp; MCP Server Setup">
+<meta property="og:description" content="Install, agent hooks, MCP server, CLI reference, config and API.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="ghostimport Docs — CLI, Agent Hooks &amp; MCP Server Setup">
+<meta name="twitter:description" content="Install, agent hooks, MCP server, CLI reference, config and API.">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "ghostimport documentation",
+      "description": "Install ghostimport, wire it into agent hooks and MCP clients, and use the CLI, config file and JavaScript API.",
+      "url": "https://fguerreir0.github.io/ghostimport/docs/",
+      "author": { "@type": "Person", "name": "Fábio Guerreiro" },
+      "about": { "@type": "SoftwareApplication", "name": "ghostimport", "applicationCategory": "DeveloperApplication" },
+      "proficiencyLevel": "Beginner"
+    },
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "ghostimport", "item": "https://fguerreir0.github.io/ghostimport/" },
+        { "@type": "ListItem", "position": 2, "name": "Docs", "item": "https://fguerreir0.github.io/ghostimport/docs/" }
+      ]
+    }
+  ]
+}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+<style>
+/* ── Page layout: sticky sidebar + prose column ──────────────────────────── */
+
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  background: rgba(13,13,22,.88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line-soft);
+}
+.topbar-in {
+  max-width: var(--page); margin: 0 auto; padding: 13px 28px;
+  display: flex; align-items: center; gap: 14px;
+}
+.topbar a.home { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--bone); }
+.topbar img { width: 26px; height: 26px; border-radius: 7px; }
+.topbar .name { font-family: var(--display); font-weight: 800; font-size: 17px; letter-spacing: -.02em; }
+.topbar .here {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--phantom-d); border: 1px solid var(--line); border-radius: 5px; padding: 2px 8px;
+}
+.topbar .spacer { flex: 1; }
+.topbar .ext { font-family: var(--mono); font-size: 12.5px; color: var(--muted); text-decoration: none; }
+.topbar .ext:hover { color: var(--phantom); }
+
+/* ── Jumbo ───────────────────────────────────────────────────────────────
+   Full-width entry band above the sidebar layout. */
+
+.jumbo { position: relative; overflow: hidden; border-bottom: 1px solid var(--line-soft); }
+.jumbo::before {
+  content: "";
+  position: absolute; inset: -60% -20% auto -20%; height: 150%;
+  background: radial-gradient(50% 55% at 50% 0%, rgba(168,168,240,.13), transparent 70%);
+  pointer-events: none;
+}
+.jumbo-in { position: relative; max-width: var(--page); margin: 0 auto; padding: 66px 28px 54px; }
+.jumbo h1 { font-size: clamp(34px, 5.4vw, 54px); font-weight: 800; letter-spacing: -.035em; margin-bottom: 18px; }
+.jumbo .lede { color: var(--muted); font-size: clamp(16.5px, 1.6vw, 18.5px); max-width: 58ch; margin: 0; }
+.jumbo .lede strong { color: var(--bone); font-weight: 600; }
+
+/* Install line, copyable */
+.runline {
+  display: inline-flex; align-items: center; gap: 16px;
+  margin-top: 30px; padding: 13px 15px 13px 20px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 11px;
+  font-family: var(--mono); font-size: 15px;
+}
+.runline .dollar { color: var(--faint); }
+.runline code { background: none; border: 0; padding: 0; color: var(--bone); font-size: 15px; }
+
+.copy {
+  font-family: var(--mono); font-size: 11px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); background: var(--raised);
+  border: 1px solid var(--line); border-radius: 7px;
+  padding: 7px 12px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.copy:hover { color: var(--bone); border-color: var(--phantom-d); }
+.copy[data-done="1"] { color: var(--safe); border-color: var(--safe); background: rgba(79,211,154,.08); }
+
+/* Three doors into the docs — the actual entry points, not decoration */
+.jump-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(216px, 1fr)); gap: 14px; margin-top: 38px; }
+.jump {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 18px 20px; border-radius: 11px; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line);
+  transition: border-color .18s, transform .18s, background .18s;
+}
+.jump:hover { border-color: var(--phantom-d); background: var(--raised); transform: translateY(-2px); }
+.jump-role { font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--phantom-d); }
+.jump-title { font-family: var(--display); font-weight: 700; font-size: 18px; color: var(--bone); letter-spacing: -.01em; }
+.jump-desc { font-size: 14px; color: var(--muted); line-height: 1.45; }
+
+.shell { max-width: var(--page); margin: 0 auto; padding: 0 28px; display: grid; grid-template-columns: 214px 1fr; gap: 52px; }
+
+nav.toc { position: sticky; top: 74px; align-self: start; max-height: calc(100vh - 90px); overflow-y: auto; padding: 40px 0; }
+nav.toc h2 {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--faint);
+  margin: 0 0 12px;
+}
+nav.toc h2 + ul { margin-bottom: 26px; }
+nav.toc ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+nav.toc a {
+  display: block; padding: 5px 12px; border-left: 2px solid var(--line-soft);
+  font-size: 14.5px; color: var(--muted); text-decoration: none;
+  transition: color .15s, border-color .15s;
+}
+nav.toc a:hover { color: var(--bone); border-left-color: var(--faint); }
+nav.toc a.active { color: var(--phantom); border-left-color: var(--phantom); }
+
+main { padding: 44px 0 90px; min-width: 0; }
+
+section.doc { padding: 40px 0; border-top: 1px solid var(--line-soft); scroll-margin-top: 78px; }
+section.doc:first-of-type { border-top: 0; padding-top: 0; }
+section.doc h2 { font-size: 27px; margin-bottom: 16px; }
+section.doc h3 { font-size: 18px; margin: 30px 0 10px; color: var(--bone); }
+section.doc p { color: var(--muted); max-width: var(--prose); margin: 0 0 16px; }
+section.doc p:last-child { margin-bottom: 0; }
+section.doc ul, section.doc ol { color: var(--muted); max-width: var(--prose); padding-left: 20px; margin: 0 0 16px; }
+section.doc li { margin-bottom: 7px; }
+section.doc li strong, section.doc p strong { color: var(--bone); font-weight: 600; }
+
+.doc .term { margin: 0 0 18px; }
+
+/* A callout carries one point that changes what the reader should do */
+.note {
+  border-left: 2px solid var(--phantom-d);
+  background: rgba(168,168,240,.05);
+  border-radius: 0 9px 9px 0;
+  padding: 15px 20px;
+  margin: 0 0 18px;
+  max-width: var(--prose);
+}
+.note.warn { border-left-color: var(--warn); background: rgba(232,180,100,.05); }
+.note.good { border-left-color: var(--safe); background: rgba(79,211,154,.05); }
+.note p { margin: 0; font-size: 15.5px; }
+.note strong { color: var(--bone); }
+
+/* ── Badge showcase ──────────────────────────────────────────────────────── */
+
+.badge-states { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin: 0 0 20px; max-width: var(--prose); }
+.badge-state {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 11px;
+  padding: 20px; border-radius: 11px;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.badge-state.clean { border-color: rgba(79,211,154,.32); }
+.badge-state.dirty { border-color: rgba(255,95,86,.30); }
+.badge-state img { height: 20px; display: block; }
+.badge-state .when { font-size: 14px; color: var(--muted); line-height: 1.45; }
+.badge-state .when b { color: var(--bone); font-weight: 600; }
+
+.snippet {
+  display: flex; align-items: center; gap: 14px;
+  background: #10101a; border: 1px solid var(--line-soft); border-radius: 9px;
+  padding: 12px 12px 12px 16px; margin: 0 0 18px; max-width: var(--prose);
+}
+.snippet code {
+  flex: 1; min-width: 0; background: none; border: 0; padding: 0;
+  color: #b9b9cc; font-size: 12.5px; overflow-x: auto; white-space: nowrap;
+}
+
+.status-list { display: grid; gap: 10px; max-width: var(--prose); margin-bottom: 18px; }
+.status {
+  display: grid; grid-template-columns: 108px 1fr; gap: 14px; align-items: baseline;
+  font-size: 15px; color: var(--muted);
+}
+.status b { font-family: var(--mono); font-size: 12.5px; font-weight: 700; }
+.status.ok b       { color: var(--safe); }
+.status.missing b  { color: var(--breach); }
+.status.susp b     { color: var(--warn); }
+.status.unknown b  { color: var(--faint); }
+
+@media (max-width: 900px) {
+  .shell { grid-template-columns: 1fr; gap: 0; }
+  nav.toc {
+    position: static; max-height: none; padding: 26px 0 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  nav.toc ul { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+  nav.toc a { border-left: 0; border: 1px solid var(--line); border-radius: 7px; padding: 5px 11px; font-size: 13px; }
+  nav.toc a.active { border-color: var(--phantom); }
+  nav.toc h2 { display: none; }
+  nav.toc h2 + ul { margin-bottom: 14px; }
+  main { padding-top: 28px; }
+}
+@media (max-width: 640px) {
+  .shell, .topbar-in { padding-left: 20px; padding-right: 20px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <a class="home" href="../"><img src="../assets/logo.png" alt=""><span class="name">ghostimport</span></a>
+    <span class="here">Docs</span>
+    <span class="spacer"></span>
+    <a class="ext" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
+    <a class="ext" href="https://www.npmjs.com/package/ghostimport">npm</a>
+  </div>
+</div>
+
+<section class="jumbo">
+  <div class="jumbo-in">
+    <p class="eyebrow">Documentation</p>
+    <h1>Set up ghostimport</h1>
+    <p class="lede">
+      Everything the tool does, on one page. If you read only one section, make it
+      <strong>agent hooks</strong> — that's the part that actually blocks an attack.
+    </p>
+
+    <div class="runline">
+      <span class="dollar">$</span>
+      <code>npm install -g ghostimport</code>
+      <button class="copy" type="button" data-copy="npm install -g ghostimport">Copy</button>
+    </div>
+
+    <div class="jump-cards">
+      <a class="jump" href="#hooks">
+        <span class="jump-role">Enforcing</span>
+        <span class="jump-title">Agent hooks</span>
+        <span class="jump-desc">Deny an install before it can run</span>
+      </a>
+      <a class="jump" href="#mcp">
+        <span class="jump-role">Self-service</span>
+        <span class="jump-title">MCP server</span>
+        <span class="jump-desc">Let the model check a name itself</span>
+      </a>
+      <a class="jump" href="#cli">
+        <span class="jump-role">Manual</span>
+        <span class="jump-title">CLI</span>
+        <span class="jump-desc">Scan a project, gate your CI</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<div class="shell">
+
+  <nav class="toc">
+    <h2>Start</h2>
+    <ul>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#quickstart">Quick start</a></li>
+    </ul>
+    <h2>With your agent</h2>
+    <ul>
+      <li><a href="#hooks">Agent hooks</a></li>
+      <li><a href="#mcp">MCP server</a></li>
+    </ul>
+    <h2>Reference</h2>
+    <ul>
+      <li><a href="#cli">CLI</a></li>
+      <li><a href="#badge">README badge</a></li>
+      <li><a href="#config">Config file</a></li>
+      <li><a href="#api">JavaScript API</a></li>
+      <li><a href="#scanning">What gets scanned</a></li>
+      <li><a href="#signals">Risk signals</a></li>
+      <li><a href="#ci">CI</a></li>
+    </ul>
+  </nav>
+
+  <main>
+
+    <!-- ── Install ──────────────────────────────────────────────────────── -->
+    <section class="doc" id="install">
+      <h2>Install</h2>
+      <p>Requires Node.js 22 or newer. Zero runtime dependencies — the published package uses only Node built-ins.</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>install</span></div>
+<pre><span class="d">#</span> <span class="c">global — recommended if you'll use the hook</span>
+npm install -g ghostimport
+
+<span class="d">#</span> <span class="c">one-off, no install</span>
+npx ghostimport
+
+<span class="d">#</span> <span class="c">as a dev dependency</span>
+npm install --save-dev ghostimport</pre>
+      </div>
+      <div class="note">
+        <p>
+          If you're wiring up the <a href="#hooks">hook</a>, install <strong>globally</strong>. Hooks run on
+          every matching tool call, and <code>npx</code> pays a startup cost each time.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Quick start ──────────────────────────────────────────────────── -->
+    <section class="doc" id="quickstart">
+      <h2>Quick start</h2>
+      <p>Point it at a project. One mode, no flags to discover — the supply-chain analysis always runs.</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>ghostimport</span></div>
+<pre><span class="d">$</span> <span class="w">ghostimport</span>
+
+  <span class="d">Scanned</span> <span class="p">142 files</span> <span class="d">·</span> <span class="p">38 packages</span>
+
+  <span class="r">✗</span> <span class="w">react-server-fetch</span>  <span class="r">does not exist on npm</span>
+    <span class="d">↳</span> <span class="d">src/data/loader.ts</span>
+    <span class="d">↳</span> <span class="y">unregistered — anyone could claim this name with a malicious postinstall</span>
+
+  <span class="r">✗</span> <span class="w">axois</span>  <span class="r">high risk</span>
+    <span class="d">↳</span> <span class="d">src/api/client.ts</span>
+    <span class="d">↳</span> <span class="y">1-2 chars from 'axios' — likely a typo</span>
+    <span class="d">↳</span> <span class="y">single version published</span>
+    <span class="d">created 2019-08-29 · 1245/week · 1 version</span>
+
+  <span class="y">⚠</span> <span class="d">not in package.json:</span> zod
+
+  <span class="r">2 problems found.</span></pre>
+      </div>
+      <p>
+        It exits <code>1</code> when an imported package doesn't exist and <code>0</code> otherwise,
+        so it works as a CI gate with no extra configuration.
+      </p>
+    </section>
+
+    <!-- ── Hooks ────────────────────────────────────────────────────────── -->
+    <section class="doc" id="hooks">
+      <h2>Agent hooks</h2>
+      <p>
+        The enforcing integration. Hooks run on every matching tool call whether or not the model
+        cooperates — unlike MCP tools, which the model has to choose to call.
+      </p>
+      <p>Add to <code>.claude/settings.json</code>:</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.claude/settings.json</span></div>
+<pre>{
+  <span class="k">"hooks"</span>: {
+    <span class="k">"PreToolUse"</span>: [
+      {
+        <span class="k">"matcher"</span>: <span class="s">"Bash"</span>,
+        <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>, <span class="k">"command"</span>: <span class="s">"ghostimport hook"</span> }]
+      }
+    ],
+    <span class="k">"PostToolUse"</span>: [
+      {
+        <span class="k">"matcher"</span>: <span class="s">"Edit|Write|MultiEdit"</span>,
+        <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>, <span class="k">"command"</span>: <span class="s">"ghostimport hook"</span> }]
+      }
+    ]
+  }
+}</pre>
+      </div>
+
+      <h3>What each one does</h3>
+      <ul>
+        <li>
+          <strong>PreToolUse on Bash</strong> — parses any <code>npm</code>, <code>pnpm</code>,
+          <code>yarn</code> or <code>bun</code> install command and <strong>denies the tool call</strong>
+          if it would fetch a package that doesn't exist, is a typosquat, or ships an install script.
+          This is the one that stops a real attack, because it fires before the postinstall could run.
+        </li>
+        <li>
+          <strong>PostToolUse on edits</strong> — reads the file the agent just wrote, extracts its
+          imports, and reports any that don't resolve.
+        </li>
+      </ul>
+
+      <h3>What the agent sees when it's blocked</h3>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>stderr</span></div>
+<pre><span class="r">ghostimport blocked this: the install command below would fetch packages
+that are unsafe or do not exist.</span>
+
+  • 'axois' exists but is high risk: name is 1-2 chars from 'axios';
+    single version published.
+
+Do not retry this command as written. Remove the flagged packages, correct
+the name if it was a typo, and tell the user what was flagged and why.</pre>
+      </div>
+
+      <div class="note good">
+        <p>
+          <strong>It fails open.</strong> Unreachable registry, malformed payload, or a check that
+          exceeds its 20-second budget → it exits <code>0</code> and gets out of the way. A security
+          tool that wedges your agent when you're offline gets uninstalled by Friday.
+        </p>
+      </div>
+      <p>
+        Results are cached for 24 hours in <code>~/.ghostimport/</code>, so the steady state is
+        zero network calls.
+      </p>
+    </section>
+
+    <!-- ── MCP ──────────────────────────────────────────────────────────── -->
+    <section class="doc" id="mcp">
+      <h2>MCP server</h2>
+      <p>
+        Gives the model tools to check a name <em>before</em> it commits to writing the import. Use it
+        alongside hooks, not instead of them — this one depends on the model choosing to call it.
+      </p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>Claude Code</span></div>
+<pre>claude mcp add ghostimport -- npx -y ghostimport mcp</pre>
+      </div>
+      <p>For Cursor, Windsurf, Zed or any other MCP client, add to its config:</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.cursor/mcp.json</span></div>
+<pre>{
+  <span class="k">"mcpServers"</span>: {
+    <span class="k">"ghostimport"</span>: {
+      <span class="k">"command"</span>: <span class="s">"npx"</span>,
+      <span class="k">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"ghostimport"</span>, <span class="s">"mcp"</span>]
+    }
+  }
+}</pre>
+      </div>
+
+      <h3>Tools it exposes</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Tool</th><th>Arguments</th><th>What it does</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>check_packages</td>
+              <td><code>packages</code>, <code>deep</code></td>
+              <td>Verify names exist on npm. <code>deep</code> adds the risk heuristics.</td>
+            </tr>
+            <tr>
+              <td>check_install_command</td>
+              <td><code>command</code></td>
+              <td>Extract and vet every package a shell command would install.</td>
+            </tr>
+            <tr>
+              <td>scan_project</td>
+              <td><code>path</code></td>
+              <td>Audit a whole directory.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <p>
+          The server speaks JSON-RPC over stdio and is written directly against the wire format —
+          no MCP SDK — so installing ghostimport still pulls in <strong>zero runtime dependencies</strong>.
+          A supply-chain tool with its own dependency tree undercuts its own argument.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── CLI ──────────────────────────────────────────────────────────── -->
+    <section class="doc" id="cli">
+      <h2>CLI</h2>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>usage</span></div>
+<pre>ghostimport [dir] [options]
+ghostimport mcp | hook</pre>
+      </div>
+
+      <h3>Options</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Flag</th><th>Effect</th></tr></thead>
+          <tbody>
+            <tr><td>--quiet, -q</td><td>Only show problems</td></tr>
+            <tr><td>--json</td><td>Output results as JSON</td></tr>
+            <tr><td>--watch, -w</td><td>Re-scan on file changes</td></tr>
+            <tr><td>--badge</td><td>Print a README badge after scanning</td></tr>
+            <tr><td>--fast</td><td>Skip the deep supply-chain check on undeclared packages</td></tr>
+            <tr><td>--no-undeclared</td><td>Hide "imported but not in package.json" warnings</td></tr>
+            <tr><td>--no-cache</td><td>Bypass the 24-hour registry cache</td></tr>
+            <tr><td>--version, -v</td><td>Print the version</td></tr>
+            <tr><td>--help, -h</td><td>Show help</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <p>
+          <code>--fast</code> only skips the deep check on packages that <em>exist</em>. Names that
+          don't exist are always reported as squattable — that check costs no extra requests, so
+          there's no way to accidentally turn off the important part.
+        </p>
+      </div>
+
+      <h3>Commands</h3>
+      <ul>
+        <li><code>ghostimport mcp</code> — run as an MCP server over stdio</li>
+        <li><code>ghostimport hook</code> — run as an agent hook, reading a hook payload on stdin</li>
+      </ul>
+
+      <h3>JSON output</h3>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>ghostimport --json</span></div>
+<pre>{
+  <span class="k">"scanned"</span>: 142,
+  <span class="k">"packages"</span>: 38,
+  <span class="k">"missing"</span>:    [{ <span class="k">"pkg"</span>: <span class="s">"react-server-fetch"</span>, <span class="k">"files"</span>: [...] }],
+  <span class="k">"undeclared"</span>: [{ <span class="k">"pkg"</span>: <span class="s">"zod"</span>, <span class="k">"files"</span>: [...] }],
+  <span class="k">"risks"</span>:      [{ <span class="k">"pkg"</span>: <span class="s">"axois"</span>, <span class="k">"type"</span>: <span class="s">"suspicious"</span>, <span class="k">"risk"</span>: <span class="s">"high"</span>, ... }],
+  <span class="k">"errors"</span>:     [],
+  <span class="k">"cacheHits"</span>:  33
+}</pre>
+      </div>
+    </section>
+
+    <!-- ── Badge ────────────────────────────────────────────────────────── -->
+    <section class="doc" id="badge">
+      <h2>README badge</h2>
+      <p>
+        Run a scan with <code>--badge</code> and it prints ready-to-paste Markdown for your
+        project's README, reflecting the result of that scan.
+      </p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>ghostimport --badge</span></div>
+<pre><span class="d">$</span> <span class="w">ghostimport --badge</span>
+
+  <span class="d">README badge:</span>
+  [![ghostimport](https://img.shields.io/badge/ghostimport-<span class="g">%E2%9C%93%20clean</span>-<span class="g">brightgreen</span>)](https://github.com/FGuerreir0/ghostimport)</pre>
+      </div>
+
+      <h3>The two states</h3>
+      <div class="badge-states">
+        <div class="badge-state clean">
+          <img src="https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen" alt="ghostimport: clean" width="128" height="20">
+          <span class="when"><b>Clean.</b> Every imported package resolves on npm.</span>
+        </div>
+        <div class="badge-state dirty">
+          <img src="https://img.shields.io/badge/ghostimport-%F0%9F%91%BB%202%20ghosts-red" alt="ghostimport: 2 ghosts" width="148" height="20">
+          <span class="when"><b>Ghosts found.</b> The count is how many imported packages don't exist.</span>
+        </div>
+      </div>
+
+      <h3>Copy the clean badge</h3>
+      <div class="snippet">
+        <code>[![ghostimport](https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen)](https://github.com/FGuerreir0/ghostimport)</code>
+        <button class="copy" type="button" data-copy="[![ghostimport](https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen)](https://github.com/FGuerreir0/ghostimport)">Copy</button>
+      </div>
+
+      <div class="note warn">
+        <p>
+          <strong>The badge is static.</strong> It captures the scan you ran when you generated it —
+          paste it and it stays that way, even if a later commit introduces a package that doesn't
+          exist. Treat it as a signal that you check imports, not as live status.
+          <strong>A self-updating badge is planned for a future release</strong>; until then, pair it
+          with the <a href="#ci">CI check</a>, which is what actually fails the build.
+        </p>
+      </div>
+    </section>
+
+    <!-- ── Config ───────────────────────────────────────────────────────── -->
+    <section class="doc" id="config">
+      <h2>Config file</h2>
+      <p>Optional. Drop a <code>.ghostimportrc.json</code> in your project root.</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.ghostimportrc.json</span></div>
+<pre>{
+  <span class="k">"ignore"</span>: [<span class="s">"@company/*"</span>, <span class="s">"internal-lib"</span>],
+  <span class="k">"includeUndeclared"</span>: <span class="p">true</span>
+}</pre>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Field</th><th>Default</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>ignore</td><td><code>[]</code></td><td>Names or scope patterns to skip. <code>@scope/*</code> is supported.</td></tr>
+            <tr><td>includeUndeclared</td><td><code>true</code></td><td>Warn on packages that exist but aren't in package.json.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Workspace packages in a monorepo and <code>paths</code> aliases from your tsconfig are
+        detected automatically — you don't need to list them.
+      </p>
+    </section>
+
+    <!-- ── API ──────────────────────────────────────────────────────────── -->
+    <section class="doc" id="api">
+      <h2>JavaScript API</h2>
+      <p>Ships with TypeScript declarations. Seven exports, each with one job.</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>node</span></div>
+<pre><span class="c">import</span> { verifyPackages, scan } <span class="c">from</span> <span class="s">'ghostimport'</span>
+
+<span class="c">// check names directly</span>
+<span class="c">await</span> verifyPackages([<span class="s">'axios'</span>, <span class="s">'axois'</span>], { deep: <span class="p">true</span> })
+<span class="c">// [ { pkg: 'axios', status: 'ok', typosquatOf: null },</span>
+<span class="c">//   { pkg: 'axois', status: 'suspicious', risk: 'high', typosquatOf: 'axios', ... } ]</span>
+
+<span class="c">// scan a directory</span>
+<span class="c">const</span> { missing, undeclared, risks } = <span class="c">await</span> scan(<span class="s">'./src'</span>)</pre>
+      </div>
+
+      <h3>Verdict statuses</h3>
+      <div class="status-list">
+        <div class="status ok"><b>ok</b><span>Exists on npm, no risk signals fired.</span></div>
+        <div class="status missing"><b>missing</b><span>Does not exist. The name is unclaimed and anyone can register it.</span></div>
+        <div class="status susp"><b>suspicious</b><span>Exists, but the heuristics rate it medium or high risk.</span></div>
+        <div class="status unknown"><b>unknown</b><span>Couldn't be checked — network or timeout. Never treat this as a failure.</span></div>
+      </div>
+
+      <h3>Exports</h3>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Export</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>scan(dir, opts?)</td><td>Scan a directory. Returns <code>ScanResult</code>.</td></tr>
+            <tr><td>verifyPackages(names, opts?)</td><td>Check a list of names. Returns <code>PackageVerdict[]</code>.</td></tr>
+            <tr><td>checkNpm(name)</td><td>Does this one package exist?</td></tr>
+            <tr><td>checkPackageRisk(name)</td><td>Full supply-chain check for one package.</td></tr>
+            <tr><td>detectTyposquat(name)</td><td>The popular package it's 1–2 chars from, or <code>null</code>.</td></tr>
+            <tr><td>extractImports(code)</td><td>Package names from a source string.</td></tr>
+            <tr><td>extractInstallTargets(cmd)</td><td>Packages a shell command would install.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── Scanning ─────────────────────────────────────────────────────── -->
+    <section class="doc" id="scanning">
+      <h2>What gets scanned</h2>
+      <p>
+        <strong>Detected:</strong> <code>import</code>, <code>require()</code>, dynamic
+        <code>import()</code>, <code>export … from</code>, scoped packages, and subpath imports
+        (<code>pkg/utils</code> resolves to <code>pkg</code>).
+      </p>
+      <p>
+        <strong>Extensions:</strong> <code>.js</code> <code>.jsx</code> <code>.ts</code>
+        <code>.tsx</code> <code>.mjs</code> <code>.cjs</code> <code>.vue</code>
+        <code>.svelte</code> <code>.astro</code>
+      </p>
+      <p>
+        For <code>.vue</code>, <code>.svelte</code> and <code>.astro</code>, only
+        <code>&lt;script&gt;</code> blocks and Astro frontmatter are read — markup is ignored, so a
+        package name that appears in template text is never flagged.
+      </p>
+      <p><strong>Ignored:</strong></p>
+      <ul>
+        <li>Node built-ins, including <code>node:</code> prefixed ones</li>
+        <li>Relative imports (<code>./</code>, <code>../</code>)</li>
+        <li>Path aliases — <code>@/</code>, <code>~/</code>, <code>$lib/</code>, and tsconfig <code>paths</code></li>
+        <li>URL and protocol imports, and virtual modules (<code>virtual:</code>, Vite internals)</li>
+        <li>Workspace packages in a monorepo</li>
+        <li><code>node_modules/</code>, <code>dist/</code>, <code>build/</code>, <code>.git/</code></li>
+      </ul>
+    </section>
+
+    <!-- ── Signals ──────────────────────────────────────────────────────── -->
+    <section class="doc" id="signals">
+      <h2>Risk signals</h2>
+      <p>
+        A name that resolves isn't automatically safe. These signals are checked against packages
+        that exist but aren't declared in your <code>package.json</code>.
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Signal</th><th>Weight</th><th>Why it matters</th></tr></thead>
+          <tbody>
+            <tr><td>postinstall / preinstall / install script</td><td><span class="weight critical">Critical</span></td><td>Runs arbitrary code the moment the package lands</td></tr>
+            <tr><td>1–2 chars from a popular name</td><td><span class="weight critical">Critical</span></td><td>The classic typosquat shape</td></tr>
+            <tr><td>Created &lt; 30 days ago</td><td><span class="weight medium">Medium</span></td><td>No track record to judge it by</td></tr>
+            <tr><td>&lt; 50 weekly downloads</td><td><span class="weight medium">Medium</span></td><td>Nobody else is depending on it</td></tr>
+            <tr><td>Single version published</td><td><span class="weight medium">Medium</span></td><td>Abandoned, or published once for a reason</td></tr>
+            <tr><td>Single maintainer</td><td><span class="weight amp">Amplifier</span></td><td>Only counts alongside another signal — plenty of good packages have one</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Rated <strong>high</strong> if any critical signal fires or two medium ones do; only
+        <code>medium</code> and <code>high</code> are reported.
+      </p>
+    </section>
+
+    <!-- ── CI ───────────────────────────────────────────────────────────── -->
+    <section class="doc" id="ci">
+      <h2>CI</h2>
+      <p>The CLI already exits non-zero on a missing package, so the simplest form is one line.</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.github/workflows/ci.yml</span></div>
+<pre><span class="d">- name:</span> Check for hallucinated packages
+  <span class="d">run:</span> npx ghostimport --quiet</pre>
+      </div>
+      <p>Or use the action, which also writes a job summary and exposes counts as outputs:</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.github/workflows/ci.yml</span></div>
+<pre><span class="d">- uses:</span> FGuerreir0/ghostimport@v0.5.0
+  <span class="d">with:</span>
+    <span class="d">path:</span> <span class="s">'.'</span></pre>
+      </div>
+      <p>For <a href="https://pre-commit.com">pre-commit</a>, in <code>.pre-commit-config.yaml</code>:</p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>.pre-commit-config.yaml</span></div>
+<pre><span class="d">repos:</span>
+  <span class="d">- repo:</span> https://github.com/FGuerreir0/ghostimport
+    <span class="d">rev:</span> v0.5.0
+    <span class="d">hooks:</span>
+      <span class="d">- id:</span> ghostimport</pre>
+      </div>
+      <div class="note">
+        <p>
+          CI is a backstop, not the main event. By the time a bad package reaches CI it's already
+          in your repo — <a href="#hooks">hooks</a> catch it while it's being written.
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <span>MIT licensed</span>
+  <a href="../">Home</a>
+  <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
+  <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+</footer>
+
+<script>
+// Copy buttons. navigator.clipboard needs a secure context, so keep a fallback
+// for anyone opening the file straight off disk.
+(function () {
+  function fallback(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e) { /* nothing more to try */ }
+    document.body.removeChild(ta);
+  }
+
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('.copy');
+    if (!btn) return;
+    var text = btn.getAttribute('data-copy');
+    var done = function () {
+      var was = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.setAttribute('data-done', '1');
+      setTimeout(function () {
+        btn.textContent = was;
+        btn.removeAttribute('data-done');
+      }, 1600);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(text); done(); });
+    } else {
+      fallback(text);
+      done();
+    }
+  });
+})();
+
+// Highlight the section currently in view in the sidebar
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.toc a'));
+  var sections = links
+    .map(function (a) { return document.querySelector(a.getAttribute('href')); })
+    .filter(Boolean);
+  if (!sections.length || !('IntersectionObserver' in window)) return;
+
+  var visible = new Set();
+
+  function sync() {
+    var current = sections.filter(function (s) { return visible.has(s.id); })[0];
+    if (!current) return;
+    links.forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current.id);
+    });
+  }
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) visible.add(e.target.id);
+      else visible.delete(e.target.id);
+    });
+    sync();
+  }, { rootMargin: '-78px 0px -70% 0px' });
+
+  sections.forEach(function (s) { io.observe(s); });
+})();
+</script>
+
+</body>
+</html>
