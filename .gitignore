@@ -35,3 +35,8 @@ coverage/
 .npmrc
 
 deploy.ps1
+
+# Unpublished research and its draft write-up. Held back deliberately; the notes
+# in research/README.md (also ignored) say why and when this lifts.
+research/
+docs/research/

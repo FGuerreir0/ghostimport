@@ -12,6 +12,7 @@
   <img src="https://github.com/FGuerreir0/ghostimport/actions/workflows/ci.yml/badge.svg" alt="CI">
   <a href="https://www.npmjs.com/package/ghostimport"><img src="https://img.shields.io/npm/v/ghostimport" alt="npm"></a>
   <a href="https://github.com/FGuerreir0/ghostimport"><img src="https://img.shields.io/badge/ghostimport-%E2%9C%93%20clean-brightgreen" alt="ghostimport"></a>
+  <a href="https://buymeacoffee.com/fabioguerreiro"><img src="https://img.shields.io/badge/buy%20me%20a%20coffee-support-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
 </p>
 
 <p align="center">
@@ -255,6 +256,11 @@ A name that doesn't exist on npm is *always* reported as squattable — that che
 ## Contributing
 
 Development setup, the source layout, and how the site in `docs/` is built and deployed all live in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Support
+
+ghostimport is free, MIT licensed and has no runtime dependencies — and it stays that way.
+If it caught something for you, you can [buy me a coffee](https://buymeacoffee.com/fabioguerreiro).
 
 ## License
 
