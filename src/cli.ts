@@ -175,6 +175,9 @@ async function runScan() {
     for (const f of problem.files.slice(0, 3)) console.log(`    ${c.gray('↳')} ${c.dim(f)}`)
     if (problem.files.length > 3) console.log(`    ${c.gray(`↳ +${problem.files.length - 3} more files`)}`)
 
+    if ('claimable' in problem && problem.claimable === false) {
+      console.log(`    ${c.gray('↳')} ${c.gray(`${problem.pkg.split('/')[0]} scope is owned — only its owner can publish this name`)}`)
+    }
     if (risk?.typosquatOf) {
       console.log(`    ${c.gray('↳')} ${c.yellow(`1-2 chars from '${risk.typosquatOf}' — likely a typo`)}`)
     }

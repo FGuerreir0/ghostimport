@@ -1,5 +1,6 @@
 import fs from 'fs'
 import path from 'path'
+import { specToPackageName } from './install'
 
 const SKIP_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', 'coverage', '.cache',
@@ -106,6 +107,8 @@ export function walkFiles(dir: string): string[] {
 export interface ProjectContext {
   /** Declared in the `dependencies` of any package.json in the tree. */
   declared: Set<string>
+  /** Registry packages each package.json makes `npm install` fetch, with the manifests declaring them. */
+  manifestDeps: Map<string, string[]>
   /** The `name` of any package.json in the tree — a local package, however it is laid out. */
   local: Set<string>
   /** Bare specifiers answered by a tsconfig path alias or an import map. */
@@ -122,6 +125,42 @@ interface PackageJsonShape {
   optionalDependencies?: Record<string, string>
 }
 
+const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'] as const
+
+/**
+ * The registry packages a package.json makes `npm install` fetch.
+ *
+ * Skips specs that never reach the registry — workspace, file, link, git and URL
+ * dependencies, GitHub shorthand — and follows `npm:` aliases to the real name.
+ */
+export function registryDeps(pkg: PackageJsonShape): string[] {
+  const names = new Set<string>()
+  for (const field of DEP_FIELDS) {
+    const deps: unknown = pkg[field]
+    if (!deps || typeof deps !== 'object' || Array.isArray(deps)) continue
+    for (const [name, raw] of Object.entries(deps)) {
+      if (typeof raw !== 'string') continue
+      const spec = raw.trim()
+      let real: string | null
+      if (spec.startsWith('npm:')) real = specToPackageName(spec.slice(4))
+      // pnpm catalogs pin a version centrally; the name still comes from the registry
+      else if (spec.startsWith('catalog:')) real = specToPackageName(name)
+      // Any other protocol, a path, or `user/repo` shorthand — version ranges never contain a slash
+      else if (/^[a-z][a-z0-9+.-]*:/i.test(spec) || /^[./~]/.test(spec) || spec.includes('/')) real = null
+      else real = specToPackageName(name)
+      if (real) names.add(real)
+    }
+  }
+  return [...names]
+}
+
+/** Registry dependencies of one package.json, or null if it cannot be read or parsed. */
+export function readManifestDeps(file: string): string[] | null {
+  let pkg: PackageJsonShape | null
+  try { pkg = parseJsonc<PackageJsonShape>(fs.readFileSync(file, 'utf8')) } catch { return null }
+  return pkg && typeof pkg === 'object' ? registryDeps(pkg) : null
+}
+
 export function readProjectContext(dir: string, maxDepth?: number): ProjectContext {
   const files = walkProject(dir, maxDepth)
   return contextFromFiles(files, dir)
@@ -129,6 +168,7 @@ export function readProjectContext(dir: string, maxDepth?: number): ProjectConte
 
 export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectContext {
   const declared = new Set<string>()
+  const manifestDeps = new Map<string, string[]>()
   const local = new Set<string>()
   const aliases = new Set<string>()
   const virtualScopes = new Set<string>()
@@ -138,8 +178,12 @@ export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectCont
     try { pkg = parseJsonc<PackageJsonShape>(fs.readFileSync(file, 'utf8')) } catch { continue }
     if (!pkg) continue
     if (pkg.name) local.add(pkg.name)
-    for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'] as const) {
+    for (const field of DEP_FIELDS) {
       for (const name of Object.keys(pkg[field] ?? {})) declared.add(name)
+    }
+    for (const name of registryDeps(pkg)) {
+      if (!manifestDeps.has(name)) manifestDeps.set(name, [])
+      manifestDeps.get(name)!.push(file)
     }
   }
 
@@ -177,7 +221,7 @@ export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectCont
   // Deno projects import from JSR, which is not the npm registry.
   if (files.denoDetected) virtualScopes.add('@std').add('@deno')
 
-  return { declared, local, aliases, virtualScopes }
+  return { declared, manifestDeps, local, aliases, virtualScopes }
 }
 
 /** Does anything in the project already answer for this bare specifier? */

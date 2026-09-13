@@ -6,9 +6,10 @@ import {
 import { extractSfcScripts } from '../src/sfc'
 import { loadConfig } from '../src/config'
 import { loadCache, saveCache } from '../src/cache'
-import { hasBlockingVerdict } from '../src/verify'
+import { hasBlockingVerdict, describeVerdict } from '../src/verify'
 import { specToPackageName } from '../src/install'
-import { readProjectContext, isResolvedLocally } from '../src/files'
+import { readProjectContext, isResolvedLocally, registryDeps } from '../src/files'
+import { checkScope } from '../src/npm'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -265,6 +266,24 @@ if (!networkAvailable) {
   assert(byName.get('this-package-absolutely-does-not-exist-ghostimport-test-xyz123')?.status === 'missing', 'unpublished package is missing')
   assert(hasBlockingVerdict(verdicts), 'missing package is blocking')
   assert(!hasBlockingVerdict([{ pkg: 'x', status: 'unknown', typosquatOf: null }]), 'unknown verdict never blocks')
+  assert(byName.get('this-package-absolutely-does-not-exist-ghostimport-test-xyz123')?.claimable === true, 'an unscoped missing name is claimable')
+
+  // Only a scope's owner can publish under it, so a missing name there is broken, not squattable
+  const [ownedScope, freeScope] = await Promise.all([
+    checkScope('@babel'),
+    checkScope('@zzqx-no-such-scope-ghostimport-8317'),
+  ])
+  assert(ownedScope.owned === true, 'an organisation scope is owned')
+  assert(freeScope.owned === false, 'an unused scope is not owned')
+
+  const scoped = new Map((await verifyPackages([
+    '@babel/this-package-does-not-exist-ghostimport-xyz123',
+    '@zzqx-no-such-scope-ghostimport-8317/pkg',
+  ])).map(v => [v.pkg, v]))
+  const inOwned = scoped.get('@babel/this-package-does-not-exist-ghostimport-xyz123')
+  assert(inOwned?.status === 'missing' && inOwned.claimable === false, 'a missing name in an owned scope is not claimable')
+  assert(scoped.get('@zzqx-no-such-scope-ghostimport-8317/pkg')?.claimable === true, 'a missing name in a free scope is claimable')
+  assert(!!inOwned && !describeVerdict(inOwned).includes('unregistered'), 'an owned-scope verdict does not call the name squattable')
 }
 
 // ─── scan ────────────────────────────────────────────────────────────────────
@@ -295,6 +314,22 @@ if (!networkAvailable) {
   // deep: false must still report squattable names — that layer costs no extra requests
   const fast = await scan(scanDir, { deep: false })
   assert(fast.risks.some(r => r.type === 'unregistered'), 'deep:false still flags unregistered names')
+
+  // A dependency nobody imports is still fetched by `npm install`
+  const manifestDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostimport-manifest-'))
+  const declaredFake = 'this-package-absolutely-does-not-exist-ghostimport-test-xyz123'
+  const ownedFake = '@babel/this-package-does-not-exist-ghostimport-xyz123'
+  fs.writeFileSync(path.join(manifestDir, 'package.json'), JSON.stringify({
+    dependencies: { [declaredFake]: '^1.0.0', [ownedFake]: '^1.0.0', shared: 'workspace:*' },
+  }))
+  const declaredOnly = await scan(manifestDir, { deep: false })
+  const missingByName = new Map(declaredOnly.missing.map(m => [m.pkg, m]))
+  assert(missingByName.get(declaredFake)?.files.join() === 'package.json', 'checks a dependency declared only in package.json')
+  assert(missingByName.get(ownedFake)?.claimable === false, 'scan marks an owned-scope name as not claimable')
+  assert(!declaredOnly.risks.some(r => r.pkg === ownedFake), 'an owned-scope name raises no squatting risk')
+  assert(declaredOnly.risks.some(r => r.pkg === declaredFake), 'a declared unscoped name is still squattable')
+  assert(!missingByName.has('shared'), 'workspace: dependencies never reach the registry')
+  fs.rmSync(manifestDir, { recursive: true })
 }
 
 fs.rmSync(scanDir, { recursive: true })
@@ -337,8 +372,39 @@ assert(resolves('@theme/Layout'), 'Docusaurus projects resolve @theme themselves
 assert(resolves('@std/assert'), 'a Deno project resolves @std from JSR, not npm')
 assert(!resolves('not-a-map'), 'a JSON file that is not an import map is ignored')
 assert(!resolves('react'), 'an ordinary dependency still goes to the registry')
+assert(ctx.manifestDeps.get('lodash')?.[0]?.endsWith(path.join('packages', 'sdk', 'package.json')) === true, 'records which package.json declares a dependency')
 
 fs.rmSync(ctxDir, { recursive: true })
+
+// ─── registryDeps ────────────────────────────────────────────────────────────
+
+console.log('\nregistryDeps()')
+
+const manifestDeps = registryDeps({
+  dependencies: {
+    react: '^18.0.0',
+    aliased: 'npm:real-package@^1.0.0',
+    '@acme/alias': 'npm:@acme/real@2',
+    shared: 'workspace:*',
+    local: 'file:../local',
+    linked: 'link:../linked',
+    fromgit: 'git+https://github.com/user/repo.git',
+    shorthand: 'user/repo#main',
+    tarball: 'https://example.com/pkg.tgz',
+    relative: './vendor/pkg',
+    catalogued: 'catalog:',
+  },
+  devDependencies: { typescript: 'latest', '@types/node': '' },
+}).sort()
+
+assert(manifestDeps.includes('react') && manifestDeps.includes('typescript'), 'keeps ordinary version ranges and tags')
+assert(manifestDeps.includes('@types/node'), 'keeps an empty spec, which means latest')
+assert(manifestDeps.includes('real-package') && !manifestDeps.includes('aliased'), 'follows an npm: alias to the real name')
+assert(manifestDeps.includes('@acme/real'), 'follows a scoped npm: alias')
+assert(manifestDeps.includes('catalogued'), 'a pnpm catalog: entry still comes from the registry')
+assert(['shared', 'local', 'linked', 'fromgit', 'shorthand', 'tarball', 'relative'].every(n => !manifestDeps.includes(n)),
+  'skips workspace, file, link, git, URL, path and GitHub shorthand specs')
+assert(registryDeps({ dependencies: 'oops' } as never).length === 0, 'tolerates a malformed dependencies field')
 
 
 // ─── MCP server (subprocess) ─────────────────────────────────────────────────
@@ -467,6 +533,28 @@ if (networkAvailable) {
     cwd: hookTmp,
   })
   assert(edited.code === 2, 'flags a hallucinated import written into a file')
+
+  const manifest = path.join(hookTmp, 'package.json')
+  const manifestText = JSON.stringify({
+    dependencies: { react: '^18.0.0', 'this-package-absolutely-does-not-exist-ghostimport-test-xyz123': '^1.0.0' },
+  }, null, 2)
+  fs.writeFileSync(manifest, manifestText)
+  const wroteManifest = await runHookProcess({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Write',
+    tool_input: { file_path: manifest, content: manifestText },
+    cwd: hookTmp,
+  })
+  assert(wroteManifest.code === 2, 'flags a non-existent dependency written into package.json')
+  assert(wroteManifest.stderr.includes('declares dependencies'), 'package.json block message names the manifest')
+
+  const bumpedReact = await runHookProcess({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Edit',
+    tool_input: { file_path: manifest, old_string: '"react": "^17.0.0"', new_string: '"react": "^18.0.0"' },
+    cwd: hookTmp,
+  })
+  assert(bumpedReact.code === 0, 'a package.json edit only checks the entries it wrote')
   fs.rmSync(hookTmp, { recursive: true })
 } else {
   console.log('  ℹ network unavailable — skipping live hook tests')

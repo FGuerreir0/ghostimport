@@ -57,10 +57,10 @@
         },
         {
           "@type": "Question",
-          "name": "Does npm audit catch hallucinated packages?",
+          "name": "Don't existing dependency scanners catch this?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. npm audit, Snyk and Socket inspect packages that are already installed and present in your lockfile. A package name that does not exist yet never reaches the lockfile, so it falls outside what those tools examine."
+            "text": "Most dependency scanners inspect packages once they are installed or listed in your lockfile. A package name that has never been published has no code and no advisory to inspect, and never reaches the lockfile. ghostimport checks the name itself, before the install."
           }
         },
         {
@@ -311,10 +311,10 @@ section:first-of-type { border-top: 0; }
           <h3>Your agent invents a dependency</h3>
           <p>
             A language model predicts the most likely next token, not the most accurate one. It writes an
-            import for a package that sounds exactly like it should exist — plausible scope, plausible
+            import for a package that sounds exactly like it should exist — plausible prefix, plausible
             name, plausible API.
           </p>
-          <span class="pkg phantom">@openai/functions-runtime <span class="tag">unregistered</span></span>
+          <span class="pkg phantom">openai-functions-runtime <span class="tag">unregistered</span></span>
         </div>
       </article>
 
@@ -338,7 +338,7 @@ section:first-of-type { border-top: 0; }
             Attackers scrape public repositories for imports that resolve to nothing, then publish those
             exact names. Registration is free, instant, and requires no interaction with you at all.
           </p>
-          <span class="pkg claimed">@openai/functions-runtime <span class="tag">published by ???</span></span>
+          <span class="pkg claimed">openai-functions-runtime <span class="tag">published by ???</span></span>
         </div>
       </article>
 
@@ -375,7 +375,7 @@ section:first-of-type { border-top: 0; }
       <p class="eyebrow">Why your scanner misses it</p>
       <h2>Audit tools inspect what you installed</h2>
       <p>
-        npm audit, Snyk and Socket are good at their job. Their job starts once a package is in your
+        Dependency scanners are good at their job. Most of that job starts once a package is in your
         lockfile — and a name that doesn't exist yet never gets there.
       </p>
     </div>
@@ -402,12 +402,12 @@ section:first-of-type { border-top: 0; }
 
       <div class="coverage">
         <div class="cov-row">
-          <div class="cov-name">npm audit</div>
-          <div class="cov-bar"><div class="cov-fill late">known CVEs, installed packages</div></div>
+          <div class="cov-name">Vulnerability audits</div>
+          <div class="cov-bar"><div class="cov-fill late">known advisories, installed packages</div></div>
         </div>
         <div class="cov-row">
-          <div class="cov-name">Snyk · Socket</div>
-          <div class="cov-bar"><div class="cov-fill late">behaviour of installed packages</div></div>
+          <div class="cov-name">Dependency scanners</div>
+          <div class="cov-bar"><div class="cov-fill late">packages already in your lockfile</div></div>
         </div>
         <div class="cov-row">
           <div class="cov-name" style="color:var(--safe)">ghostimport</div>
@@ -536,23 +536,21 @@ claude mcp add ghostimport \
       <p class="eyebrow">Latest scan · 2026-08-30</p>
       <h2>We ran it on 174 public repositories</h2>
       <p>
-        Every number on this site comes from a scan you can reproduce. The most recent one
-        covered 174 repositories and 23,773 source files — and what it found was not what
-        we went looking for.
+        The most recent scan covered 174 repositories and 23,773 source files, and it did not
+        find what we went looking for.
       </p>
     </div>
 
     <div class="scanstats">
       <div class="stat"><div class="n">174</div><div class="l">Repos scanned</div></div>
       <div class="stat"><div class="n">0</div><div class="l">Organic hallucinations</div></div>
-      <div class="stat phantom"><div class="n">404</div><div class="l">Repos importing one unowned name</div></div>
+      <div class="stat"><div class="n">4,555</div><div class="l">Unique imports checked</div></div>
     </div>
 
     <p class="report-note">
       Nobody's hallucinated import survived to a public repo — the build catches those in
-      seconds. But a name emitted by an <strong>AI app builder</strong> into hundreds of
-      generated projects has never been published to npm, and is still unregistered. We reported
-      it to the vendor on 2026-08-30 and have had no response, so the name stays withheld.
+      seconds. The window that matters is the minute <strong>before the commit</strong>, which is
+      where ghostimport runs.
     </p>
 
     <div class="cta-row" style="margin-top:24px">
@@ -579,11 +577,11 @@ claude mcp add ghostimport \
       </div>
 
       <div class="faq-item">
-        <h3>Does npm audit catch hallucinated packages?</h3>
+        <h3>Don't existing dependency scanners catch this?</h3>
         <p>
-          No. npm audit, Snyk and Socket inspect packages that are already installed and present in
-          your lockfile. A package name that doesn't exist yet never reaches the lockfile, so it
-          falls outside what those tools examine.
+          Most dependency scanners inspect packages once they are installed or listed in your lockfile.
+          A package name that has never been published has no code and no advisory to inspect, and
+          never reaches the lockfile. ghostimport checks the name itself, before the install.
         </p>
       </div>
 
@@ -643,6 +641,7 @@ claude mcp add ghostimport \
     <span>MIT licensed</span>
     <a href="docs/">Docs</a>
     <a href="research/">Field report</a>
+    <a href="releases/">Releases</a>
     <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
     <a href="https://www.npmjs.com/package/ghostimport">npm</a>
     <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>

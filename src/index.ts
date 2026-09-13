@@ -29,6 +29,7 @@ export type {
   ScanResult,
   PackageRef,
   PackageError,
+  MissingRef,
   RiskEntry,
   NpmCheckResult,
   PackageRiskResult,

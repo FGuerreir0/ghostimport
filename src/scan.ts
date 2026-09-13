@@ -6,6 +6,7 @@ import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
 import { checkNpm, checkPackageRisk, detectTyposquat } from './npm'
 import { walkProject, contextFromFiles, isResolvedLocally } from './files'
+import { checkClaimable } from './verify'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
 const CONCURRENCY = 10
@@ -36,6 +37,13 @@ export async function scan(
       if (!importMap.has(pkg)) importMap.set(pkg, [])
       importMap.get(pkg)!.push(path.relative(targetDir, file))
     }
+  }
+
+  // `npm install` fetches every declared dependency whether or not anything imports
+  // it, so a name in package.json that npm has never heard of is just as squattable.
+  for (const [pkg, manifests] of ctx.manifestDeps) {
+    if (!importMap.has(pkg)) importMap.set(pkg, [])
+    importMap.get(pkg)!.push(...manifests.map(m => path.relative(targetDir, m)))
   }
 
   const allPkgs = [...importMap.keys()].filter(
@@ -78,7 +86,7 @@ export async function scan(
       onProgress?.({ pkg, exists, error, total: allPkgs.length, done: i + j + 1 })
 
       if (exists === false) {
-        results.missing.push({ pkg, files: matchedFiles })
+        results.missing.push({ pkg, files: matchedFiles, claimable: null })
       } else if (exists === null && error) {
         results.errors.push({ pkg, error, files: matchedFiles })
       } else if (exists === true && !declaredDeps.has(pkg)) {
@@ -87,11 +95,16 @@ export async function scan(
     }
   }
 
+  // A missing name is squattable unless it sits in a scope someone already owns.
+  // One request per distinct scope; unscoped names cost nothing.
+  const claimable = await checkClaimable(results.missing.map(m => m.pkg), cache, useCache)
+  for (const entry of results.missing) entry.claimable = claimable.get(entry.pkg) ?? null
+
   if (useCache) saveCache(cache)
   results.cacheHits = cacheHits
 
-  // Every missing name is squattable by definition — free to derive, no extra requests
-  for (const { pkg, files: matchedFiles } of results.missing) {
+  for (const { pkg, files: matchedFiles, claimable: canClaim } of results.missing) {
+    if (canClaim === false) continue
     results.risks.push({ pkg, files: matchedFiles, type: 'unregistered', typosquatOf: detectTyposquat(pkg) })
   }
 

@@ -31,11 +31,21 @@ export interface PackageError extends PackageRef {
   error: string
 }
 
+export interface MissingRef extends PackageRef {
+  /**
+   * Could a stranger publish this name? Unscoped names, always. A scoped name only
+   * when nobody owns its scope — inside an owned scope only the owner can publish,
+   * so the import is broken but not squattable. `null` when the scope could not be checked.
+   */
+  claimable: boolean | null
+}
+
 /**
  * A supply-chain finding.
  *
  * `unregistered` — the name has no owner, so anyone can publish it. This is the
  * slopsquatting case: the import is already in your code, waiting to resolve.
+ *                  A missing name inside a scope someone owns is not listed.
  * `suspicious`   — the name is published, but the heuristics rate it risky.
  */
 export type RiskEntry =
@@ -57,8 +67,8 @@ export type RiskEntry =
 export interface ScanResult {
   scanned: number
   packages: number
-  /** Imported names that do not exist on npm. */
-  missing: PackageRef[]
+  /** Names imported in code, or declared in any package.json, that do not exist on npm. */
+  missing: MissingRef[]
   /** Names that exist on npm but aren't declared in package.json. */
   undeclared: PackageRef[]
   /** Supply-chain findings, covering both missing and undeclared names. */
@@ -100,6 +110,8 @@ export interface PackageVerdict {
   pkg: string
   status: VerdictStatus
   typosquatOf: string | null
+  /** `missing` only: could a stranger publish this name? See `MissingRef.claimable`. */
+  claimable?: boolean | null
   risk?: 'medium' | 'high'
   flags?: string[]
   installScripts?: string[]

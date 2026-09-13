@@ -23,7 +23,7 @@
 
 Your agent invents a package name. It doesn't exist on npm *yet*. Someone is watching for exactly that, and the moment they register it, `npm install` runs their `postinstall` script on your machine.
 
-This is **slopsquatting**. `npm audit`, Snyk and Socket don't catch it — they only inspect packages you've already installed. ghostimport checks names against the live registry at the moment your agent writes or installs them.
+This is **slopsquatting**. Most dependency scanners inspect packages after they are installed; ghostimport checks names before they are — against the live registry, at the moment your agent writes or installs them.
 
 ```
 $ ghostimport
@@ -73,7 +73,7 @@ Add to `.claude/settings.json`:
 ```
 
 - **`PreToolUse` on Bash** — reads any install command and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or ships an install script. This is the one that stops a real attack.
-- **`PostToolUse` on edits** — checks imports the agent just wrote and tells it to fix them.
+- **`PostToolUse` on edits** — checks imports the agent just wrote, or dependencies it just added to a `package.json`, and tells it to fix them.
 
 The agent sees why it was stopped:
 
@@ -208,7 +208,9 @@ const { missing, undeclared, risks } = await scan('./src')
 interface ScanResult {
   scanned: number
   packages: number
-  missing: { pkg: string; files: string[] }[]     // don't exist on npm
+  missing: { pkg: string; files: string[]; claimable: boolean | null }[]
+                                                  // don't exist on npm; claimable is false
+                                                  // inside a scope someone already owns
   undeclared: { pkg: string; files: string[] }[]  // exist, but not in package.json
   risks: RiskEntry[]                              // supply-chain findings
   errors: { pkg: string; error: string; files: string[] }[]
@@ -223,14 +225,14 @@ type RiskEntry =
       created: string; downloads: number | null; versions: number }
 ```
 
-Types are shipped with the package: `ScanResult`, `ScanOptions`, `RiskEntry`, `PackageVerdict`, `VerdictStatus`, `PackageRiskResult`, `NpmCheckResult`, `Config`.
+Types are shipped with the package: `ScanResult`, `ScanOptions`, `MissingRef`, `RiskEntry`, `PackageVerdict`, `VerdictStatus`, `PackageRiskResult`, `NpmCheckResult`, `Config`.
 
 </details>
 
 <details>
 <summary>What gets scanned, and what raises a risk</summary>
 
-**Detects:** `import`, `require()`, dynamic `import()`, `export … from`, scoped packages, subpath imports (`pkg/utils` → `pkg`), and `<script>` blocks in `.vue`, `.svelte` and `.astro` (markup is ignored, so a package name in template text is never flagged).
+**Detects:** `import`, `require()`, dynamic `import()`, `export … from`, scoped packages, subpath imports (`pkg/utils` → `pkg`), and `<script>` blocks in `.vue`, `.svelte` and `.astro` (markup is ignored, so a package name in template text is never flagged). Also every registry dependency declared in any `package.json`, whether or not anything imports it — `workspace:`, `file:`, `link:`, git and URL specs are skipped, and `npm:` aliases are followed to the real name.
 
 **Extensions:** `.js` `.jsx` `.ts` `.tsx` `.mjs` `.cjs` `.vue` `.svelte` `.astro`
 
@@ -249,7 +251,7 @@ Types are shipped with the package: `ScanResult`, `ScanOptions`, `RiskEntry`, `P
 
 `high` if any critical signal fires, or 2+ medium ones. Only `medium` and `high` are reported.
 
-A name that doesn't exist on npm is *always* reported as squattable — that check costs no extra requests, so `--fast` doesn't disable it.
+A name that doesn't exist on npm is reported as squattable unless it sits in a scope someone already owns — only a scope's owner can publish under it, so `@babel/made-up` is a broken import but not a squatting target. That check costs at most one request per scope, so `--fast` doesn't disable it.
 
 </details>
 

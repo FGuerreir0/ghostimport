@@ -130,8 +130,8 @@ function buildTools(): ToolDefinition[] {
     {
       name: 'scan_project',
       description:
-        'Scan a project directory for imports of npm packages that do not exist, and for packages ' +
-        'imported but missing from package.json. Use this to audit a codebase — for a single package ' +
+        'Scan a project directory for npm packages that do not exist — imported in code or declared in ' +
+        'package.json — and for packages imported but missing from package.json. Use this to audit a codebase — for a single package ' +
         'name, use check_packages instead.',
       inputSchema: {
         type: 'object',
@@ -146,13 +146,14 @@ function buildTools(): ToolDefinition[] {
         const lines = [`Scanned ${results.scanned} files, checked ${results.packages} unique packages in ${target}.`]
 
         if (results.missing.length === 0) {
-          lines.push('\nEvery imported package exists on npm.')
+          lines.push('\nEvery imported and declared package exists on npm.')
         } else {
           lines.push(`\n${results.missing.length} package(s) DO NOT EXIST on npm:`)
-          for (const { pkg, files } of results.missing) {
-            lines.push(`  - ${pkg}  (${files.slice(0, 5).join(', ')}${files.length > 5 ? `, +${files.length - 5} more` : ''})`)
+          for (const { pkg, files, claimable } of results.missing) {
+            const owned = claimable === false ? ` — ${pkg.split('/')[0]} scope is owned, not squattable` : ''
+            lines.push(`  - ${pkg}  (${files.slice(0, 5).join(', ')}${files.length > 5 ? `, +${files.length - 5} more` : ''})${owned}`)
           }
-          lines.push('These imports will fail to install and the names are free for an attacker to register. Fix them.')
+          lines.push('These will fail to install. Names marked [SQUATTABLE] below are also free for an attacker to register. Fix them.')
         }
 
         for (const entry of results.risks) {

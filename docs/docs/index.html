@@ -227,6 +227,7 @@ section.doc li strong, section.doc p strong { color: var(--bone); font-weight: 6
     <a class="home" href="../"><img src="../assets/logo.png" alt=""><span class="name">ghostimport</span></a>
     <span class="here">Docs</span>
     <span class="spacer"></span>
+    <a class="ext" href="../releases/">Releases</a>
     <a class="ext" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
     <a class="ext" href="https://www.npmjs.com/package/ghostimport">npm</a>
   </div>
@@ -342,7 +343,7 @@ npm install --save-dev ghostimport</pre>
   <span class="r">2 problems found.</span></pre>
       </div>
       <p>
-        It exits <code>1</code> when an imported package doesn't exist and <code>0</code> otherwise,
+        It exits <code>1</code> when an imported or declared package doesn't exist and <code>0</code> otherwise,
         so it works as a CI gate with no extra configuration.
       </p>
     </section>
@@ -385,7 +386,8 @@ npm install --save-dev ghostimport</pre>
         </li>
         <li>
           <strong>PostToolUse on edits</strong> — reads the file the agent just wrote, extracts its
-          imports, and reports any that don't resolve.
+          imports, and reports any that don't resolve. For a <code>package.json</code>, it checks the
+          dependencies the edit added instead.
         </li>
       </ul>
 
@@ -517,7 +519,7 @@ ghostimport mcp | hook</pre>
 <pre>{
   <span class="k">"scanned"</span>: 142,
   <span class="k">"packages"</span>: 38,
-  <span class="k">"missing"</span>:    [{ <span class="k">"pkg"</span>: <span class="s">"react-server-fetch"</span>, <span class="k">"files"</span>: [...] }],
+  <span class="k">"missing"</span>:    [{ <span class="k">"pkg"</span>: <span class="s">"react-server-fetch"</span>, <span class="k">"files"</span>: [...], <span class="k">"claimable"</span>: true }],
   <span class="k">"undeclared"</span>: [{ <span class="k">"pkg"</span>: <span class="s">"zod"</span>, <span class="k">"files"</span>: [...] }],
   <span class="k">"risks"</span>:      [{ <span class="k">"pkg"</span>: <span class="s">"axois"</span>, <span class="k">"type"</span>: <span class="s">"suspicious"</span>, <span class="k">"risk"</span>: <span class="s">"high"</span>, ... }],
   <span class="k">"errors"</span>:     [],
@@ -616,7 +618,7 @@ ghostimport mcp | hook</pre>
       <h3>Verdict statuses</h3>
       <div class="status-list">
         <div class="status ok"><b>ok</b><span>Exists on npm, no risk signals fired.</span></div>
-        <div class="status missing"><b>missing</b><span>Does not exist. The name is unclaimed and anyone can register it.</span></div>
+        <div class="status missing"><b>missing</b><span>Does not exist. Anyone can register the name — unless it sits in a scope someone already owns, which <code>claimable: false</code> marks.</span></div>
         <div class="status susp"><b>suspicious</b><span>Exists, but the heuristics rate it medium or high risk.</span></div>
         <div class="status unknown"><b>unknown</b><span>Couldn't be checked — network or timeout. Never treat this as a failure.</span></div>
       </div>
@@ -645,6 +647,11 @@ ghostimport mcp | hook</pre>
         <strong>Detected:</strong> <code>import</code>, <code>require()</code>, dynamic
         <code>import()</code>, <code>export … from</code>, scoped packages, and subpath imports
         (<code>pkg/utils</code> resolves to <code>pkg</code>).
+      </p>
+      <p>
+        <strong>Declared:</strong> every registry dependency in any <code>package.json</code>, whether or
+        not anything imports it. <code>workspace:</code>, <code>file:</code>, <code>link:</code>, git and
+        URL specs are skipped, and <code>npm:</code> aliases are followed to the real name.
       </p>
       <p>
         <strong>Extensions:</strong> <code>.js</code> <code>.jsx</code> <code>.ts</code>
@@ -732,6 +739,7 @@ ghostimport mcp | hook</pre>
 <footer>
   <span>MIT licensed</span>
   <a href="../">Home</a>
+  <a href="../releases/">Releases</a>
   <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
   <a href="https://www.npmjs.com/package/ghostimport">npm</a>
   <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>

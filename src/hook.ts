@@ -6,7 +6,8 @@
 //
 // Two guards:
 //   PreToolUse  + Bash  → vet packages an install command would fetch, before it runs
-//   PostToolUse + edits → check imports the agent just wrote into a source file
+//   PostToolUse + edits → check imports the agent just wrote into a source file, or
+//                         dependencies it just wrote into a package.json
 //
 // Fails open. A network outage, a malformed payload or an internal error must never
 // wedge the agent loop, so anything unexpected exits 0 silently.
@@ -15,7 +16,7 @@ import fs from 'fs'
 import path from 'path'
 import { extractImports } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
-import { CODE_EXTS, readProjectContext, isResolvedLocally } from './files'
+import { CODE_EXTS, readProjectContext, isResolvedLocally, readManifestDeps } from './files'
 import { loadConfig, matchesIgnore } from './config'
 import { extractInstallTargets } from './install'
 import { verifyPackages, describeVerdict } from './verify'
@@ -27,6 +28,8 @@ const BLOCK = 2
 // Bounded so a slow registry can never stall the agent
 const BUDGET_MS = 20_000
 const MAX_PACKAGES = 40
+// A full package.json write can legitimately list more than a source file imports
+const MAX_MANIFEST_PACKAGES = 200
 const HOOK_SCAN_DEPTH = 4
 
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
@@ -95,6 +98,8 @@ async function checkEditedFile(payload: HookPayload): Promise<{ code: number; me
   const filePath = typeof payload.tool_input?.file_path === 'string' ? payload.tool_input.file_path : ''
   if (!filePath) return { code: ALLOW }
 
+  if (path.basename(filePath) === 'package.json') return checkEditedManifest(payload, filePath)
+
   const ext = path.extname(filePath)
   if (!CODE_EXTS.has(ext)) return { code: ALLOW }
 
@@ -119,6 +124,48 @@ async function checkEditedFile(payload: HookPayload): Promise<{ code: number; me
       `${path.relative(payload.cwd ?? process.cwd(), filePath)} imports packages that do not exist on npm.`,
       'Fix the imports now: use a package that is actually published, or write the functionality yourself. ' +
       'Do not add these names to package.json.',
+    ),
+  }
+}
+
+/** The text a tool call wrote — `content` for Write, `new_string` for Edit and MultiEdit. */
+function writtenText(input: Record<string, unknown> | undefined): string | null {
+  if (!input) return null
+  const parts: string[] = []
+  if (typeof input.content === 'string') parts.push(input.content)
+  if (typeof input.new_string === 'string') parts.push(input.new_string)
+  if (Array.isArray(input.edits)) {
+    for (const edit of input.edits as Array<{ new_string?: unknown }>) {
+      if (typeof edit?.new_string === 'string') parts.push(edit.new_string)
+    }
+  }
+  return parts.length > 0 ? parts.join('\n') : null
+}
+
+async function checkEditedManifest(payload: HookPayload, filePath: string): Promise<{ code: number; message?: string }> {
+  const deps = readManifestDeps(filePath)
+  if (!deps) return { code: ALLOW }
+
+  // Only the entries this edit wrote, so bumping one version doesn't re-verify the
+  // whole manifest. Falls back to everything when the payload carries no text.
+  const written = writtenText(payload.tool_input)
+  const touched = written === null ? deps : deps.filter(pkg => written.includes(`"${pkg}"`))
+
+  const isLocal = localNames(payload.cwd ?? process.cwd())
+  const declared = touched.filter(pkg => !isLocal(pkg)).slice(0, MAX_MANIFEST_PACKAGES)
+  if (declared.length === 0) return { code: ALLOW }
+
+  const verdicts = await verifyPackages(declared)
+  const problems = verdicts.filter(v => v.status === 'missing')
+  if (problems.length === 0) return { code: ALLOW }
+
+  return {
+    code: BLOCK,
+    message: report(
+      verdicts,
+      `${path.relative(payload.cwd ?? process.cwd(), filePath)} declares dependencies that do not exist on npm.`,
+      'Fix package.json now: remove these entries or replace them with packages that are actually published, ' +
+      'before anything runs an install.',
     ),
   }
 }

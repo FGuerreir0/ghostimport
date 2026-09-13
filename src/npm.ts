@@ -127,6 +127,47 @@ export function checkNpm(pkgName: string): Promise<NpmCheckResult> {
   })
 }
 
+/**
+ * Does anyone own this npm scope? Only a scope's owner can publish names under it,
+ * so a missing `@scope/name` is squattable only when the scope itself is free.
+ *
+ * The org endpoint answers for user scopes as well as organisations, without auth:
+ * 200 for an owned scope, 404 ("Scope not found") for a free one.
+ */
+export function checkScope(scope: string): Promise<{ owned: boolean | null; error?: string }> {
+  return new Promise((resolve) => {
+    const options = {
+      hostname: 'registry.npmjs.org',
+      path: `/-/org/${encodeURIComponent(scope.replace(/^@/, ''))}/package`,
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      timeout: 8000,
+    }
+
+    const req = https.request(options, (res) => {
+      res.resume()
+      if (res.statusCode === 200) {
+        resolve({ owned: true })
+      } else if (res.statusCode === 404) {
+        resolve({ owned: false })
+      } else {
+        resolve({ owned: null, error: `HTTP ${res.statusCode}` })
+      }
+    })
+
+    req.on('timeout', () => {
+      req.destroy()
+      resolve({ owned: null, error: 'timeout' })
+    })
+
+    req.on('error', (err: Error) => {
+      resolve({ owned: null, error: err.message })
+    })
+
+    req.end()
+  })
+}
+
 const INSTALL_HOOKS = new Set(['preinstall', 'install', 'postinstall'])
 
 /** Full supply-chain check for one package: registry metadata plus risk heuristics. */

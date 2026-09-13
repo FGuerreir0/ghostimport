@@ -1,8 +1,48 @@
 import { loadCache, saveCache, getCached } from './cache'
-import { checkNpm, checkPackageRisk, detectTyposquat } from './npm'
+import { checkNpm, checkPackageRisk, checkScope, detectTyposquat } from './npm'
 import type { CacheEntry, NpmCheckResult, PackageVerdict, VerifyOptions } from './types'
 
 const CONCURRENCY = 10
+
+/**
+ * Which of these missing names could a stranger publish? An unscoped name always;
+ * a scoped one only if nobody owns the scope. `null` when the scope could not be checked.
+ *
+ * Scope answers share the registry cache under the bare `@scope` key — never a valid
+ * package name, so it cannot collide — with `exists` meaning the scope is owned.
+ * Mutates `cache`; the caller saves it.
+ */
+export async function checkClaimable(
+  pkgs: string[],
+  cache: Record<string, CacheEntry>,
+  useCache: boolean,
+): Promise<Map<string, boolean | null>> {
+  const scopes = [...new Set(pkgs.filter(p => p.startsWith('@')).map(p => p.split('/')[0]))]
+  const owned = new Map<string, boolean | null>()
+
+  for (let i = 0; i < scopes.length; i += CONCURRENCY) {
+    const batch = scopes.slice(i, i + CONCURRENCY)
+    const answers = await Promise.all(batch.map(async (scope) => {
+      const cached = getCached(cache, scope)
+      if (cached) return cached.exists
+      const { owned: isOwned } = await checkScope(scope)
+      if (isOwned !== null && useCache) cache[scope] = { exists: isOwned, ts: Date.now() }
+      return isOwned
+    }))
+    batch.forEach((scope, j) => owned.set(scope, answers[j]))
+  }
+
+  const claimable = new Map<string, boolean | null>()
+  for (const pkg of pkgs) {
+    if (!pkg.startsWith('@')) {
+      claimable.set(pkg, true)
+      continue
+    }
+    const isOwned = owned.get(pkg.split('/')[0]) ?? null
+    claimable.set(pkg, isOwned === null ? null : !isOwned)
+  }
+  return claimable
+}
 
 /**
  * Verify a list of package names against the npm registry.
@@ -50,6 +90,14 @@ export async function verifyPackages(
     }
   }
 
+  // A missing name is only squattable if nobody owns its scope
+  const missing = verdicts.filter(v => v.status === 'missing')
+  if (missing.length > 0) {
+    const claimable = await checkClaimable(missing.map(v => v.pkg), cache, useCache)
+    for (const v of missing) v.claimable = claimable.get(v.pkg) ?? null
+    if (missing.some(v => v.pkg.startsWith('@'))) cacheDirty = true
+  }
+
   if (useCache && cacheDirty) {
     try { saveCache(cache) } catch { /* cache is best-effort */ }
   }
@@ -87,6 +135,10 @@ export function describeVerdict(v: PackageVerdict): string {
       const squat = v.typosquatOf
         ? ` It is 1-2 characters from '${v.typosquatOf}', which is a classic typosquat pattern — you may have meant '${v.typosquatOf}'.`
         : ''
+      if (v.claimable === false) {
+        const scope = v.pkg.split('/')[0]
+        return `'${v.pkg}' DOES NOT EXIST on npm.${squat} The ${scope} scope already has an owner, so only they could publish it — the import is broken, but nobody else can claim the name.`
+      }
       return `'${v.pkg}' DOES NOT EXIST on npm.${squat} The name is unregistered, so installing it could hand an attacker code execution the moment they claim it.`
     }
     case 'suspicious': {

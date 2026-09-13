@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Release Notes — ghostimport</title>
+<meta name="description" content="What changed in each ghostimport release: new checks, fixes, and what to do when upgrading.">
+<meta name="author" content="Fábio Guerreiro">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="icon" type="image/png" href="../assets/logo.png">
+<link rel="apple-touch-icon" href="../assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/releases/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/releases/">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:title" content="Release Notes — ghostimport">
+<meta property="og:description" content="What changed in each ghostimport release: new checks, fixes, and what to do when upgrading.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:card" content="summary">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+
+<style>
+/* Page-specific layout only. Anything that defines the identity is in site.css. */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 26px 0 0; font-family: var(--mono); font-size: 13px;
+}
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a:hover { color: var(--phantom); }
+.topbar .home { display: inline-flex; align-items: center; gap: 9px; color: var(--bone); }
+.topbar .home img { width: 24px; height: 24px; }
+
+.masthead { padding: 54px 0 34px; border-bottom: 1px solid var(--line-soft); }
+.masthead h1 { font-size: clamp(34px, 5.6vw, 54px); }
+.masthead .lede { font-size: 18px; color: var(--muted); max-width: var(--prose); margin: 18px 0 0; }
+
+/* One release: version rail on the left, notes on the right */
+.release {
+  display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 32px;
+  padding: 44px 0; border-bottom: 1px solid var(--line-soft);
+}
+.release:last-of-type { border-bottom: 0; }
+.rail .ver { font-family: var(--display); font-size: 28px; font-weight: 700; letter-spacing: -.02em; color: var(--bone); }
+.rail .ver a { color: inherit; text-decoration: none; }
+.rail .ver a:hover { color: var(--phantom); }
+.rail .date { font-family: var(--mono); font-size: 12px; color: var(--faint); margin-top: 6px; }
+.rail .tag {
+  display: inline-block; margin-top: 12px; padding: 3px 8px; border-radius: 6px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+  border: 1px solid var(--line); color: var(--muted);
+}
+.rail .tag.latest { border-style: dashed; border-color: var(--phantom-d); color: var(--phantom); }
+.rail .tag.breaking { border-color: var(--breach); color: var(--breach); }
+
+.notes h2 {
+  font-family: var(--mono); font-size: 12px; font-weight: 500; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--faint); margin: 26px 0 10px;
+}
+.notes h2:first-child { margin-top: 4px; }
+.notes p, .notes ul { color: var(--muted); max-width: var(--prose); }
+.notes p { margin: 0 0 10px; }
+.notes ul { margin: 0; padding-left: 20px; }
+.notes li { margin: 8px 0; line-height: 1.6; }
+.notes strong { color: var(--bone); font-weight: 600; }
+.notes .table-scroll { margin: 10px 0 4px; }
+
+@media (max-width: 640px) {
+  .masthead { padding: 34px 0 26px; }
+  .release { grid-template-columns: 1fr; gap: 14px; padding: 34px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="topbar">
+    <a class="home" href="../"><img src="../assets/logo.png" alt="">ghostimport</a>
+    <span><a href="../docs/">Docs</a> &nbsp; <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a></span>
+  </nav>
+
+  <header class="masthead">
+    <p class="eyebrow">Release notes</p>
+    <h1>What changed</h1>
+    <p class="lede">
+      Every published version, newest first. Upgrade notes are at the end of a release when there
+      is something you need to do.
+    </p>
+  </header>
+
+  <!-- v0.6.0 -->
+  <article class="release" id="v0.6.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.6.0">v0.6.0</a></div>
+      <div class="date">2026-09-13</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <h2>Checks</h2>
+      <ul>
+        <li>
+          <strong>Dependencies in <code>package.json</code> are checked</strong>, even when nothing
+          imports them. <code>npm install</code> fetches every declared dependency, so a name there that
+          npm has never heard of is as squattable as one in an import. <code>workspace:</code>,
+          <code>file:</code>, <code>link:</code>, git and URL specs are skipped, and <code>npm:</code>
+          aliases are checked under the real package name.
+        </li>
+        <li>
+          <strong>Scoped names are only called squattable when the scope is free.</strong> Only a
+          scope's owner can publish under it, so <code>@babel/made-up</code> is a broken import but not
+          a target. ghostimport now asks the registry whether the scope has an owner — one request per
+          scope, cached for 24 hours.
+        </li>
+      </ul>
+
+      <h2>Agent hook</h2>
+      <ul>
+        <li>
+          <strong>Edits to <code>package.json</code> are checked.</strong> When an agent writes a
+          dependency that doesn't exist, the <code>PostToolUse</code> hook blocks it and tells the agent
+          to fix the entry. Only the entries the edit wrote are checked, so bumping one version doesn't
+          re-verify the whole file.
+        </li>
+      </ul>
+
+      <h2>Output</h2>
+      <ul>
+        <li>
+          Entries in <code>missing</code> carry <code>claimable: boolean | null</code> — <code>false</code>
+          inside an owned scope, <code>null</code> when the scope couldn't be checked. Verdicts from
+          <code>verifyPackages()</code> carry the same field. New exported type: <code>MissingRef</code>.
+        </li>
+        <li>
+          For a name in an owned scope, the CLI prints <code>scope is owned — only its owner can publish
+          this name</code> instead of the squatting warning. The MCP <code>scan_project</code> tool marks
+          those names the same way.
+        </li>
+      </ul>
+
+      <h2>Upgrading</h2>
+      <ul>
+        <li>No breaking API changes.</li>
+        <li>
+          <strong>CI may report new problems.</strong> A dependency that only exists on a private
+          registry, and is declared in <code>package.json</code> without being imported, is now checked
+          against public npm. Add it to <code>ignore</code> in <code>.ghostimportrc.json</code>.
+        </li>
+        <li>
+          The first scan of a project with many dependencies makes more registry requests than before.
+          Later runs are served from the cache.
+        </li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.5.2 -->
+  <article class="release" id="v0.5.2">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.5.2">v0.5.2</a></div>
+      <div class="date">2026-08-30</div>
+    </div>
+    <div class="notes">
+      <p>
+        False-positive fixes, found by running the scanner against 174 public repositories. Popular
+        repositories reporting a problem fell from 19.1% to 12.8%, AI-assisted ones from 11.8% to 5.5%.
+        The <a href="../research/">field report</a> has the details.
+      </p>
+      <h2>Fixes</h2>
+      <ul>
+        <li>Nested <code>package.json</code> and <code>tsconfig.json</code> files are read, so workspace packages in a monorepo are no longer reported as missing.</li>
+        <li>Scoped path aliases match their subpaths: the alias <code>@commands/*</code> now answers the import <code>@commands/types</code>.</li>
+        <li>The JSONC parser no longer strips <code>https://</code> inside strings, which had broken every Deno import map it read.</li>
+        <li>Docusaurus <code>@theme/*</code> and <code>@site/*</code>, and Deno <code>@std/*</code> and <code>@deno/*</code>, are recognised as framework scopes rather than npm names.</li>
+        <li>Build output such as <code>.next</code>, <code>.vercel</code> and <code>.svelte-kit</code> is no longer scanned.</li>
+        <li>Specifiers ending in a non-JavaScript extension, like <code>shared.dart</code>, are no longer read as package names.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.5.1 -->
+  <article class="release" id="v0.5.1">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.5.1">v0.5.1</a></div>
+      <div class="date">2026-08-29</div>
+    </div>
+    <div class="notes">
+      <p>Maintenance release. No changes to the package code.</p>
+      <ul>
+        <li>CI moved to <code>actions/checkout</code> and <code>actions/setup-node</code> v5.</li>
+        <li>Development setup moved from the README into <code>CONTRIBUTING.md</code>.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.5.0 -->
+  <article class="release" id="v0.5.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.5.0">v0.5.0</a></div>
+      <div class="date">2026-08-29</div>
+      <span class="tag breaking">Breaking</span>
+    </div>
+    <div class="notes">
+      <h2>New</h2>
+      <ul>
+        <li>
+          <strong>MCP server.</strong> <code>ghostimport mcp</code> lets an AI agent verify packages before
+          it imports or installs them, through three tools: <code>check_packages</code>,
+          <code>check_install_command</code> and <code>scan_project</code>. Still no runtime dependencies.
+        </li>
+        <li>
+          <strong>Agent hook.</strong> <code>ghostimport hook</code> blocks install commands that would fetch
+          a package that doesn't exist, looks like a typosquat or ships an install script, and flags imports
+          of missing packages right after an edit. It fails open: a network error never blocks the agent.
+        </li>
+        <li>Install commands for npm, pnpm, yarn and bun are parsed, so the hook knows what they would fetch.</li>
+      </ul>
+
+      <h2>Changed</h2>
+      <ul>
+        <li>
+          The unregistered-name and typosquat checks <strong>run by default</strong>. <code>--scary</code>
+          is still accepted, so existing scripts keep working. The new <code>--fast</code> skips the deeper
+          registry checks.
+        </li>
+        <li>First release published from CI with an npm provenance attestation.</li>
+      </ul>
+
+      <h2>Breaking: library API</h2>
+      <p>
+        Public exports went from 11 to 7. Added: <code>verifyPackages</code> and
+        <code>extractInstallTargets</code>. Removed from the public API: <code>extractSfcScripts</code>,
+        <code>loadCache</code>, <code>saveCache</code>, <code>loadConfig</code>, <code>walkFiles</code>,
+        <code>readPackageJsonDeps</code> and the <code>CacheEntry</code> type. Renamed:
+      </p>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>v0.4.0</th><th>v0.5.0</th></tr></thead>
+          <tbody>
+            <tr><td><code>checkScary()</code></td><td><code>checkPackageRisk()</code></td></tr>
+            <tr><td><code>ScaryEntry</code></td><td><code>RiskEntry</code></td></tr>
+            <tr><td><code>ScaryCheckResult</code></td><td><code>PackageRiskResult</code></td></tr>
+            <tr><td><code>ScanResult.hallucinated</code></td><td><code>ScanResult.missing</code></td></tr>
+            <tr><td><code>ScanResult.notInPackageJson</code></td><td><code>ScanResult.undeclared</code></td></tr>
+            <tr><td><code>ScanResult.scary</code></td><td><code>ScanResult.risks</code></td></tr>
+            <tr><td><code>ScanOptions.scary</code></td><td><code>ScanOptions.deep</code> (defaults to <code>true</code>)</td></tr>
+            <tr><td>status <code>'hallucinated'</code></td><td>status <code>'missing'</code></td></tr>
+            <tr><td><code>RiskEntry.type: 'available'</code></td><td><code>RiskEntry.type: 'unregistered'</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The CLI's JSON output follows the same field renames.</p>
+    </div>
+  </article>
+
+  <!-- v0.4.0 -->
+  <article class="release" id="v0.4.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.4.0">v0.4.0</a></div>
+      <div class="date">2026-07-11</div>
+    </div>
+    <div class="notes">
+      <ul>
+        <li>
+          <strong>Vue, Svelte and Astro.</strong> Imports in <code>.vue</code>, <code>.svelte</code> and
+          <code>.astro</code> files are scanned. Only <code>&lt;script&gt;</code> blocks and Astro frontmatter
+          are read, so a package name in markup is never flagged.
+        </li>
+        <li>New logo.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.3.0 -->
+  <article class="release" id="v0.3.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.3.0">v0.3.0</a></div>
+      <div class="date">2026-07-01</div>
+    </div>
+    <div class="notes">
+      <ul>
+        <li><strong>Typosquat detection.</strong> Names one or two characters away from a popular package are flagged.</li>
+        <li><code>checkScary()</code> and <code>detectTyposquat()</code> are available from the library.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.2.0 -->
+  <article class="release" id="v0.2.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.2.0">v0.2.0</a></div>
+      <div class="date">2026-06-29</div>
+    </div>
+    <div class="notes">
+      <ul>
+        <li><code>--badge</code> prints a README badge with the result of the scan.</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- v0.1.4 -->
+  <article class="release" id="v0.1.4">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.1.4">v0.1.4</a></div>
+      <div class="date">2026-06-29</div>
+    </div>
+    <div class="notes">
+      <p>
+        First public release: a CLI that finds imports of npm packages that don't exist, with
+        <code>--json</code>, <code>--watch</code>, <code>--quiet</code>, a 24-hour registry cache, and
+        <code>--scary</code> for the squatting checks.
+      </p>
+    </div>
+  </article>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="../">Home</a>
+    <a href="../docs/">Docs</a>
+    <a href="../research/">Field report</a>
+    <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
+    <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+    <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>
+  </footer>
+
+</div>
+
+</body>
+</html>
