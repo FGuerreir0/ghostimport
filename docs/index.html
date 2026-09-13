@@ -241,6 +241,16 @@ section:first-of-type { border-top: 0; }
   .step-num { width: 46px; height: 40px; font-size: 13px; }
   .step::before { left: 22px; top: 42px; }
 }
+
+/* Field report — dashed tile keeps the motif: a name nobody owns */
+.scanstats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.scanstats .stat { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 22px; }
+.scanstats .stat.phantom { border-style: dashed; border-color: var(--phantom-d); background: rgba(168,168,240,.05); }
+.scanstats .n { font-family: var(--display); font-size: 40px; font-weight: 700; line-height: 1; letter-spacing: -.03em; color: var(--bone); }
+.scanstats .stat.phantom .n { color: var(--phantom); }
+.scanstats .l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 12px; line-height: 1.45; }
+.report-note { max-width: 62ch; color: var(--muted); margin: 22px 0 0; }
+.report-note strong { color: var(--bone); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -520,6 +530,36 @@ claude mcp add ghostimport \
     </div>
   </section>
 
+  <!-- ── Field report ──────────────────────────────────── -->
+  <section id="report">
+    <div class="section-head">
+      <p class="eyebrow">Latest scan · 2026-08-30</p>
+      <h2>We ran it on 174 public repositories</h2>
+      <p>
+        Every number on this site comes from a scan you can reproduce. The most recent one
+        covered 174 repositories and 23,773 source files — and what it found was not what
+        we went looking for.
+      </p>
+    </div>
+
+    <div class="scanstats">
+      <div class="stat"><div class="n">174</div><div class="l">Repos scanned</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">Organic hallucinations</div></div>
+      <div class="stat phantom"><div class="n">404</div><div class="l">Repos importing one unowned name</div></div>
+    </div>
+
+    <p class="report-note">
+      Nobody's hallucinated import survived to a public repo — the build catches those in
+      seconds. But a name emitted by an <strong>AI app builder</strong> into hundreds of
+      generated projects has never been published to npm, and is still unregistered. We reported
+      it to the vendor on 2026-08-30 and have had no response, so the name stays withheld.
+    </p>
+
+    <div class="cta-row" style="margin-top:24px">
+      <a class="btn primary" href="research/">Read the field report</a>
+    </div>
+  </section>
+
   <!-- ── FAQ ───────────────────────────────────────────────────────────── -->
   <section id="faq">
     <div class="section-head">
@@ -602,8 +642,10 @@ claude mcp add ghostimport \
   <footer>
     <span>MIT licensed</span>
     <a href="docs/">Docs</a>
+    <a href="research/">Field report</a>
     <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
     <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+    <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>
   </footer>
 
 </div>

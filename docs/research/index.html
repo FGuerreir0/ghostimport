@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Report — 404 Repos Import a Package That Doesn't Exist</title>
+<meta name="description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. The interesting result was not the hallucinations — it was one unregistered name shipped by an AI app builder into hundreds of repos.">
+<meta name="keywords" content="slopsquatting research, hallucinated npm package study, supply chain security report, AI generated code">
+<meta name="author" content="Fábio Guerreiro">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="icon" type="image/png" href="../assets/logo.png">
+<link rel="apple-touch-icon" href="../assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/research/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/research/">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:title" content="Field Report — 404 Repos Import a Package That Doesn't Exist">
+<meta property="og:description" content="174 repositories scanned. Zero organic hallucinations survive a build. One unregistered name sits in 404 public repos, free for anyone to claim.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Field Report — 404 Repos Import a Package That Doesn't Exist">
+<meta name="twitter:description" content="174 repositories scanned. One unregistered name sits in 404 public repos, free for anyone to claim.">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+
+<!-- Structured data. Every figure below also appears in the page body. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Report",
+  "headline": "404 repositories import a package that nobody owns",
+  "description": "A scan of 174 public GitHub repositories for npm imports that resolve to nothing. No organic hallucinations survive to a public repo, but one unregistered name emitted by an AI app builder appears in hundreds of them.",
+  "datePublished": "2026-09-13",
+  "inLanguage": "en",
+  "url": "https://fguerreir0.github.io/ghostimport/research/",
+  "author": { "@type": "Person", "name": "Fábio Guerreiro" },
+  "about": { "@type": "SoftwareApplication", "name": "ghostimport", "applicationCategory": "DeveloperApplication" },
+  "keywords": "slopsquatting, supply chain security, hallucinated npm package, AI generated code"
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+
+<style>
+/* Page-specific layout only. Anything that defines the identity is in site.css. */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 26px 0 0; font-family: var(--mono); font-size: 13px;
+}
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a:hover { color: var(--phantom); }
+.topbar .home { display: inline-flex; align-items: center; gap: 9px; color: var(--bone); }
+.topbar .home img { width: 24px; height: 24px; }
+
+.masthead { padding: 54px 0 40px; border-bottom: 1px solid var(--line-soft); }
+.masthead h1 { font-size: clamp(34px, 5.6vw, 58px); max-width: 20ch; }
+.masthead .lede { font-size: 19px; color: var(--muted); max-width: var(--prose); margin: 20px 0 0; }
+.masthead .lede strong { color: var(--bone); font-weight: 600; }
+
+.dateline {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px;
+  font-family: var(--mono); font-size: 12px; color: var(--faint);
+}
+.dateline b { color: var(--muted); font-weight: 500; }
+
+section { padding: 52px 0; border-bottom: 1px solid var(--line-soft); }
+section h2 { font-size: clamp(25px, 3.4vw, 34px); max-width: 24ch; }
+section p { max-width: var(--prose); color: var(--muted); }
+section p strong { color: var(--bone); font-weight: 600; }
+section h3 { font-size: 19px; margin: 34px 0 10px; color: var(--bone); }
+
+/* Headline figures. Dashed frame = a name nobody owns, per the site motif. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 30px 0 8px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 22px; }
+.fig.phantom { border-style: dashed; border-color: var(--phantom-d); background: rgba(168,168,240,.05); }
+.fig .n { font-family: var(--display); font-size: 40px; font-weight: 700; line-height: 1; color: var(--bone); letter-spacing: -.03em; }
+.fig.phantom .n { color: var(--phantom); }
+.fig .l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 12px; }
+.fig .s { font-size: 14px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+
+.callout {
+  border-left: 3px solid var(--phantom-d); background: rgba(168,168,240,.05);
+  padding: 18px 22px; border-radius: 0 10px 10px 0; margin: 28px 0;
+}
+.callout p { margin: 0; color: var(--bone); max-width: none; }
+
+td .ok { color: var(--safe); }
+td .no { color: var(--breach); }
+.num { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .masthead { padding: 34px 0 28px; }
+  section { padding: 38px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="topbar">
+    <a class="home" href="../"><img src="../assets/logo.png" alt="">ghostimport</a>
+    <span><a href="../docs/">Docs</a> &nbsp; <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a></span>
+  </nav>
+
+  <header class="masthead">
+    <p class="eyebrow">Field report</p>
+    <h1>404 repositories import a package that nobody owns</h1>
+    <p class="lede">
+      We scanned <strong>174 public GitHub repositories</strong> looking for npm imports that
+      resolve to nothing. The hallucinations we went looking for were not there. What we found
+      instead was a single name, emitted by an AI app builder into hundreds of repos, that
+      <strong>has never been published</strong> — and is free for anyone to claim today.
+    </p>
+    <div class="dateline">
+      <span><b>Scanned</b> 2026-08-30</span>
+      <span><b>Published</b> 2026-09-13</span>
+      <span><b>Corpus</b> 174 repositories · 23,773 source files · 4,555 unique imports</span>
+      <span><b>Tool</b> ghostimport v0.5.2</span>
+    </div>
+  </header>
+
+  <!-- Method -->
+  <section>
+    <p class="eyebrow">Method</p>
+    <h2>Two cohorts, because one of them was the control</h2>
+    <p>
+      A hallucinated import is supposed to be an AI problem, so scanning only well-maintained
+      projects would prove nothing either way. We built two groups: the most popular JavaScript
+      and TypeScript repositories on GitHub, and a set of recent repositories whose READMEs
+      advertise that they were built with an AI tool.
+    </p>
+
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead>
+          <tr><th>Cohort</th><th>Selection</th><th>Repos</th><th>Files</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Established</td>
+            <td>Over 5,000 stars, JS or TS — axios, redux, date-fns, react-hook-form, socket.io</td>
+            <td class="num">47</td><td class="num">10,894</td>
+          </tr>
+          <tr>
+            <td>AI-assisted</td>
+            <td>Created after 2025-06, README says “vibe coded”, “built with Cursor”, or names another AI app builder</td>
+            <td class="num">127</td><td class="num">12,879</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">
+      Each repository was downloaded as a tarball from the GitHub API, scanned with
+      <code>ghostimport --json</code>, and discarded. Every name reported as missing was then
+      checked by hand against the live registry. That last step is the one that matters, and it
+      is the reason this report claims less than we expected it to.
+    </p>
+  </section>
+
+  <!-- Finding 1 -->
+  <section>
+    <p class="eyebrow">Finding 01</p>
+    <h2>Hallucinated imports do not survive to a public repository</h2>
+
+    <div class="figures">
+      <div class="fig">
+        <div class="n">0</div>
+        <div class="l">Organic hallucinations</div>
+        <div class="s">Across all 174 repositories, in both cohorts.</div>
+      </div>
+      <div class="fig">
+        <div class="n">4,555</div>
+        <div class="l">Unique imports checked</div>
+        <div class="s">Every one resolved, was local, or was a deliberate fixture.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      This is a null result, and it is worth stating plainly because it undercuts the pitch most
+      tools in this space make, including the one we started with. A package name your AI
+      invented breaks the build the first time anyone runs <code>npm install</code>. It gets
+      noticed in seconds and fixed before the commit. By the time code reaches a public
+      repository, the build has already filtered that mistake out.
+    </p>
+
+    <div class="callout">
+      <p>
+        The corollary is the useful part: <strong>scanning finished repositories is the wrong
+        place to look.</strong> The window where a hallucinated name is dangerous is the minute
+        between the agent writing it and the developer running the install — which is why
+        ghostimport ships as an MCP server and an agent hook, not only as a linter.
+      </p>
+    </div>
+
+    <h3>One trap worth naming</h3>
+    <p>
+      Our first pass turned up a cluster of convincing hallucinations —
+      <code>@anthropic/sdk</code>, <code>@openai/api</code>, <code>@langchain/agents</code> —
+      exactly the names a language model would invent, none of which exist. They all came from a
+      single repository: a competing tool whose test suite deliberately contains fake package
+      names. Anyone publishing a percentage without opening the files is counting someone else's
+      fixtures.
+    </p>
+  </section>
+
+  <!-- Finding 2 -->
+  <section>
+    <p class="eyebrow">Finding 02</p>
+    <h2>One unregistered name, shipped by a code generator into hundreds of repos</h2>
+
+    <div class="figures">
+      <div class="fig phantom">
+        <div class="n">404</div>
+        <div class="l">Distinct public repos</div>
+        <div class="s">Across 657 file matches — the full result set, not a sample.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">0</div>
+        <div class="l">Versions ever published</div>
+        <div class="s">The registry has never held this name. It is free to claim.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      The name is imported by the same two configuration files in repository after repository.
+      Those files are near-identical across projects that have nothing else in common, which is
+      the signature of a scaffold: they are emitted by an <strong>AI app builder</strong> into the
+      projects it generates.
+    </p>
+    <p>
+      The package does not exist on npm. It never has. The registry answers a request for it with
+      a 404 — which is also, as it happens, the number of public repositories that import it.
+    </p>
+    <p>
+      Code search returns 657 file matches across <strong>404 distinct public repositories</strong>.
+      Every match is in one of those two files, in the layouts the scaffold emits. Private
+      repositories are not indexed, so the real number is higher.
+    </p>
+
+    <div class="callout">
+      <p>
+        <strong>Why the name is withheld.</strong> We reported this privately to the vendor on
+        2026-08-30, through its vulnerability disclosure program, with a proposed publication date
+        of 2026-09-13. As of that date we have had no response, and the name is still unregistered.
+        Naming it now would hand anyone a ready-made list of targets, so this report leaves out the
+        package, the vendor and the affected files. We will publish them once the name is reserved
+        or the template is fixed.
+      </p>
+    </div>
+
+    <h3>Why this shape is the dangerous one</h3>
+    <p>
+      A hallucination in one developer's file is a build error. A name baked into a generator's
+      template is a <strong>standing target</strong>: it is reproduced automatically, it looks
+      official in a lockfile or a dependency review, and every project that has it waits on
+      the same unclaimed name. Registering it would put attacker-controlled code one
+      <code>npm install</code> away from every one of those repositories, with a postinstall
+      script that runs before anybody reads a line of it.
+    </p>
+    <p>
+      We have not registered the name and will not. It has been reported so that the vendor can
+      publish or reserve it before somebody else does.
+    </p>
+
+    <h3>The same pattern, smaller blast radius</h3>
+    <p>
+      The scan found this shape twice more. <code>@the0/sdk</code> and <code>@the0/react</code>
+      are imported by the example projects inside their own repository, and neither has ever been
+      published. Both names were unclaimed when this was written.
+    </p>
+  </section>
+
+  <!-- Finding 3 -->
+  <section>
+    <p class="eyebrow">Finding 03</p>
+    <h2>What the corpus found in ghostimport itself</h2>
+    <p>
+      A scanner that reports a problem in one popular repository out of four is not a security
+      tool, it is a nuisance. This corpus was the first time ghostimport had been pointed at a
+      large body of real-world code, and it did not come out of it well.
+    </p>
+
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead>
+          <tr><th>Measure</th><th>v0.5.1</th><th>v0.5.2</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Established repos reporting a missing package</td><td class="no num">19.1%</td><td class="ok num">12.8%</td></tr>
+          <tr><td>AI-assisted repos reporting a missing package</td><td class="no num">11.8%</td><td class="ok num">5.5%</td></tr>
+          <tr><td>Distinct false names reported</td><td class="no num">55</td><td class="ok num">25</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">Six causes, all fixed in v0.5.2:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Cause</th><th>What it broke</th></tr></thead>
+        <tbody>
+          <tr><td>Root-only config</td><td>A monorepo's nested <code>package.json</code> and <code>tsconfig.json</code> were invisible, so workspace packages looked missing</td></tr>
+          <tr><td>Scoped aliases</td><td>The alias <code>@commands</code> was stored, then compared against the import <code>@commands/types</code> — it could never match</td></tr>
+          <tr><td>Comment stripping</td><td>The JSONC parser ate <code>https://</code> inside strings, destroying every Deno import map it read</td></tr>
+          <tr><td>Framework scopes</td><td><code>@theme/*</code> and <code>@site/*</code> are resolved by Docusaurus, <code>@std/*</code> by Deno — none are npm names</td></tr>
+          <tr><td>Build output</td><td><code>.vercel</code> and friends were walked, so bundled vendor code was scanned as though someone had imported it</td></tr>
+          <tr><td>Non-JS specifiers</td><td><code>shared.dart</code> was parsed as a package name, because dots are legal in npm names</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">
+      Two thirds of what remains is deliberate: fake names inside test fixtures, in projects that
+      test import parsing. We chose not to suppress test directories. Agents write tests too, and
+      a hallucinated import in a test file is still a real one.
+    </p>
+  </section>
+
+  <!-- Scan log -->
+  <section id="log">
+    <p class="eyebrow">Scan log</p>
+    <h2>Every corpus run, and what it returned</h2>
+    <p>
+      Numbers on this site come from running the tool, not from estimating. This log records each
+      corpus scan behind the claims above, so any figure can be traced to a version and a date.
+    </p>
+
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Corpus</th><th>Version</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-08-30</td>
+            <td>174 repos · 23,773 files</td>
+            <td>v0.5.2</td>
+            <td>25 names reported · <span class="ok">3 confirmed unregistered</span> · 0 organic hallucinations</td>
+          </tr>
+          <tr>
+            <td>2026-08-29</td>
+            <td>174 repos · 24,414 files</td>
+            <td>v0.5.1</td>
+            <td>55 names reported · <span class="no">30 false positives traced to 6 causes</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Reproduce it</h3>
+    <p>
+      None of this needs our data. Point the scanner at any repository and check the names it
+      reports against the registry yourself.
+    </p>
+
+    <div class="term" style="margin-top:20px">
+      <div class="term-bar"><i></i><i></i><i></i><span>reproduce</span></div>
+<pre><span class="d">$</span> <span class="w">npx ghostimport@0.5.2</span> <span class="p">./some-repo</span> <span class="p">--json</span>
+<span class="d">$</span> <span class="w">npm view</span> <span class="p">&lt;name-it-reported&gt;</span>   <span class="c"># a 404 means the name is free</span></pre>
+    </div>
+  </section>
+
+  <!-- Close -->
+  <section style="border-bottom:0">
+    <h2>If you build a code generator, check your own templates</h2>
+    <p>
+      This finding took one command to confirm and would have taken one command to
+      prevent. Any scaffold that emits an import is publishing a claim on a name; if that name is
+      unregistered, the claim is an open invitation. This applies to starter templates, internal
+      CLIs and documentation examples as much as to AI builders.
+    </p>
+    <div class="cta-row" style="margin-top:28px">
+      <a class="btn primary" href="../docs/">Run it on your project</a>
+      <a class="btn" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="../">Home</a>
+    <a href="../docs/">Docs</a>
+    <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
+    <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+    <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>
+  </footer>
+
+</div>
+
+</body>
+</html>

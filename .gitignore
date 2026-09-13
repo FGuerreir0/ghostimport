@@ -36,7 +36,6 @@ coverage/
 
 deploy.ps1
 
-# Unpublished research and its draft write-up. Held back deliberately; the notes
-# in research/README.md (also ignored) say why and when this lifts.
-research/
-docs/research/
+# Local only: working data and the unredacted field report. research/README.md
+# (also ignored) says why, and what to do when the vendor responds.
+/research/
