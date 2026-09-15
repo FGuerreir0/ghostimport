@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Field Report — 404 Repos Imported a Package Nobody Owned</title>
-<meta name="description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
+<meta name="description" content="I scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta name="keywords" content="slopsquatting research, hallucinated npm package study, supply chain security report, AI generated code">
 <meta name="author" content="Fábio Guerreiro">
 <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
@@ -15,11 +15,11 @@
 <meta property="og:url" content="https://fguerreir0.github.io/ghostimport/research/">
 <meta property="og:site_name" content="ghostimport">
 <meta property="og:title" content="Field Report — 404 Repos Imported a Package Nobody Owned">
-<meta property="og:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
+<meta property="og:description" content="I scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Field Report — 404 Repos Imported a Package Nobody Owned">
-<meta name="twitter:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
+<meta name="twitter:description" content="I scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
 
 <!-- Structured data. Every figure below also appears in the page body. -->
@@ -28,7 +28,7 @@
   "@context": "https://schema.org",
   "@type": "Report",
   "headline": "404 repositories imported an npm package nobody owned",
-  "description": "We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.",
+  "description": "I scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.",
   "datePublished": "2026-09-13",
   "dateModified": "2026-09-15",
   "inLanguage": "en",
@@ -110,11 +110,10 @@ td .no { color: var(--breach); }
     <p class="eyebrow">Field report</p>
     <h1>404 repositories imported a package nobody owned</h1>
     <p class="lede">
-      We scanned <strong>174 public GitHub repositories</strong> looking for npm imports that
-      resolve to nothing. The hallucinations we went looking for were not there. What we found
-      instead was a single name, emitted by an AI app builder into hundreds of repos, that
-      <strong>had never been published</strong> and was free for anyone to claim. We reported it,
-      and Lovable reserved the name 16 days later.
+      I scanned 174 public GitHub repositories looking for npm imports that AI tools made up. I
+      didn't find any. What I did find was a package name that Lovable's project template had put
+      into 404 public repos, and nobody had ever published it on npm. I reported it to Lovable, and
+      they reserved the name 16 days later.
     </p>
     <div class="dateline">
       <span><b>Scanned</b> 2026-08-30</span>
@@ -128,28 +127,27 @@ td .no { color: var(--breach); }
   <!-- Method -->
   <section>
     <p class="eyebrow">Method</p>
-    <h2>Two cohorts, because one of them was the control</h2>
+    <h2>How I picked the repos</h2>
     <p>
-      A hallucinated import is supposed to be an AI problem, so scanning only well-maintained
-      projects would prove nothing either way. We built two groups: the most popular JavaScript
-      and TypeScript repositories on GitHub, and a set of recent repositories whose READMEs
-      advertise that they were built with an AI tool.
+      If made-up imports are an AI problem, they should show up more often in projects built with
+      AI. So I scanned two groups: popular JavaScript and TypeScript projects as a baseline, and
+      recent repos whose README says they were built with an AI tool.
     </p>
 
     <div class="table-scroll" style="margin-top:26px">
       <table>
         <thead>
-          <tr><th>Cohort</th><th>Selection</th><th>Repos</th><th>Files</th></tr>
+          <tr><th>Group</th><th>How they were chosen</th><th>Repos</th><th>Files</th></tr>
         </thead>
         <tbody>
           <tr>
             <td>Established</td>
-            <td>Over 5,000 stars, JS or TS — axios, redux, date-fns, react-hook-form, socket.io</td>
+            <td>Over 5,000 stars, JS or TS, e.g. axios, redux, date-fns, react-hook-form, socket.io</td>
             <td class="num">47</td><td class="num">10,894</td>
           </tr>
           <tr>
             <td>AI-assisted</td>
-            <td>Created after 2025-06, README says “vibe coded”, “built with Lovable”, “built with Cursor”</td>
+            <td>Created after 2025-06, README says “vibe coded”, “built with Lovable” or “built with Cursor”</td>
             <td class="num">127</td><td class="num">12,879</td>
           </tr>
         </tbody>
@@ -157,158 +155,152 @@ td .no { color: var(--breach); }
     </div>
 
     <p style="margin-top:22px">
-      Each repository was downloaded as a tarball from the GitHub API, scanned with
-      <code>ghostimport --json</code>, and discarded. Every name reported as missing was then
-      checked by hand against the live registry. That last step is the one that matters, and it
-      is the reason this report claims less than we expected it to.
+      For each repo I downloaded the tarball from the GitHub API, ran
+      <code>ghostimport --json</code> on it, and deleted it. Then I looked up every flagged name on
+      the npm registry by hand. That manual check ended up mattering most, because a lot of what the
+      tool flagged was wrong. More on that in Finding 03.
     </p>
 
     <p>
-      Everything used public data only: repository tarballs and code search through the GitHub API,
-      and the public npm registry. We ran no code from any repository, registered no package names,
-      and contacted no project except through its published disclosure channel.
+      I only used public data: repo tarballs and code search through the GitHub API, and the public
+      npm registry. I didn't run code from any of these repos, didn't register any package names, and
+      the only project I contacted was Lovable, through their official disclosure program.
     </p>
   </section>
 
   <!-- Finding 1 -->
   <section>
     <p class="eyebrow">Finding 01</p>
-    <h2>Hallucinated imports do not survive to a public repository</h2>
+    <h2>No made-up imports reached a public repo</h2>
 
     <div class="figures">
       <div class="fig">
         <div class="n">0</div>
         <div class="l">Organic hallucinations</div>
-        <div class="s">Across all 174 repositories, in both cohorts.</div>
+        <div class="s">Across all 174 repos, in both groups.</div>
       </div>
       <div class="fig">
         <div class="n">4,555</div>
         <div class="l">Unique imports checked</div>
-        <div class="s">All but three resolved, were local, or were deliberate fixtures.</div>
+        <div class="s">All but three were on npm, were local code, or were fake on purpose in tests.</div>
       </div>
     </div>
 
     <p style="margin-top:26px">
-      This is a null result, and it is worth stating plainly because it undercuts the pitch most
-      tools in this space make, including the one we started with. A package name your AI
-      invented breaks the build the first time anyone runs <code>npm install</code>. It gets
-      noticed in seconds and fixed before the commit. By the time code reaches a public
-      repository, the build has already filtered that mistake out.
+      Honestly, this surprised me, and it undercuts how I had been pitching ghostimport. It makes
+      sense, though. If an AI invents a package name, <code>npm install</code> fails the first time
+      anyone runs it. Somebody notices, fixes it, and only then commits. By the time the code is on
+      GitHub, the mistake is long gone.
     </p>
 
     <div class="callout">
       <p>
-        The corollary is the useful part: <strong>scanning finished repositories is the wrong
-        place to look.</strong> The window where a hallucinated name is dangerous is the minute
-        between the agent writing it and the developer running the install — which is why
-        ghostimport ships as an MCP server and an agent hook, not only as a linter.
+        So scanning finished repos is the wrong place to look. The risky moment is between the agent
+        writing the import and someone running the install. That's why ghostimport also runs as an
+        MCP server and as an agent hook, and not only as a command-line scanner.
       </p>
     </div>
 
-    <h3>One trap worth naming</h3>
+    <h3>A false alarm I nearly reported</h3>
     <p>
-      Our first pass turned up a cluster of convincing hallucinations —
-      <code>@anthropic/sdk</code>, <code>@openai/api</code>, <code>@langchain/agents</code> —
-      exactly the names a language model would invent, none of which exist. They all came from a
-      single repository: another open-source tool in this space, whose test suite deliberately contains fake package
-      names. That is why every name in this report was opened and checked by hand.
+      My first pass turned up <code>@anthropic/sdk</code>, <code>@openai/api</code> and
+      <code>@langchain/agents</code>. They look exactly like names a model would invent, and none of
+      them exist on npm. All three came from one repo: another open-source tool in this space, which
+      keeps fake package names in its test suite on purpose. After that, I opened every flagged file
+      before counting anything.
     </p>
   </section>
 
   <!-- Finding 2 -->
   <section>
     <p class="eyebrow">Finding 02</p>
-    <h2>One unregistered name, shipped by a code generator into hundreds of repos</h2>
+    <h2>One template, 404 repos, and a package name nobody had registered</h2>
 
     <div class="figures">
       <div class="fig phantom">
         <div class="n">404</div>
         <div class="l">Distinct public repos</div>
-        <div class="s">Imported the name when we scanned, across 657 file matches — the full result set, not a sample.</div>
+        <div class="s">Imported the name when I scanned: 657 file matches, the full result set.</div>
       </div>
       <div class="fig">
         <div class="n">16</div>
         <div class="l">Days from report to fix</div>
-        <div class="s">Lovable reserved the name on 2026-09-15. It is no longer free to claim.</div>
+        <div class="s">Lovable reserved the name on 2026-09-15.</div>
       </div>
     </div>
 
     <p style="margin-top:26px">
-      <code>lovable-agent-playwright-config</code> was imported by
-      <code>playwright.config.ts</code> and <code>playwright-fixture.ts</code> in repository after
-      repository. Those two files were near-identical across projects that had nothing else in
-      common, which is the signature of a scaffold: they came from <strong>Lovable</strong>, an AI
-      app builder, in the projects it generates.
+      The name was <code>lovable-agent-playwright-config</code>. It showed up in two files,
+      <code>playwright.config.ts</code> and <code>playwright-fixture.ts</code>, and those files looked
+      almost the same in projects that had nothing else in common. They come from the template
+      Lovable uses when it generates a project.
     </p>
     <p>
-      When we scanned, the package did not exist on npm and never had. Code search returned 657 file
-      matches across <strong>404 distinct public repositories</strong>, every one in those two
-      filenames, at the repository root or under <code>frontend/</code> or <code>client/</code>.
-      Private repositories are not indexed, so the real number was higher.
+      When I scanned, nobody had ever published that package on npm. GitHub code search found it in
+      657 files across 404 public repos, always in one of those two files, either at the root or
+      inside <code>frontend/</code> or <code>client/</code>. Code search doesn't cover private repos,
+      so the real number was higher.
     </p>
 
-    <h3>Why this shape is the dangerous one</h3>
+    <h3>Why it mattered</h3>
     <p>
-      A hallucination in one developer's file is a build error. A name baked into a generator's
-      template is a <strong>standing target</strong>: it is reproduced automatically, it looks
-      official because it carries the vendor's own prefix, and every project that has it waits on
-      the same unclaimed name. Registering it would have put attacker-controlled code one
-      <code>npm install</code> away from every one of those repositories, with a postinstall script
-      that runs before anybody reads a line of it.
+      A made-up import in one person's code just breaks their build. A made-up import in a template
+      gets copied into every project the template creates. This one also started with
+      <code>lovable-</code>, so it would have looked legitimate to anyone reading it. If a stranger
+      had registered the name first, installing it, which is exactly what a developer or an AI agent
+      does to fix a missing import, would have run their code. npm runs a package's
+      <code>postinstall</code> script automatically.
     </p>
 
-    <h3>Disclosure and fix</h3>
+    <h3>Reporting it</h3>
     <div class="table-scroll" style="margin-top:14px">
       <table>
         <thead><tr><th>Date</th><th>What happened</th></tr></thead>
         <tbody>
-          <tr><td>2026-08-30</td><td>Found in the corpus scan and reported privately through Lovable's vulnerability disclosure program on HackerOne</td></tr>
-          <tr><td>2026-09-13</td><td>This report published with the finding withheld: no product, no files, no scale</td></tr>
-          <tr><td>2026-09-15</td><td>Lovable registered the name as an empty placeholder and closed the report as resolved</td></tr>
+          <tr><td>2026-08-30</td><td>Found it in the scan and reported it privately to Lovable through their disclosure program on HackerOne</td></tr>
+          <tr><td>2026-09-13</td><td>Published this report, leaving out anything that identified the issue</td></tr>
+          <tr><td>2026-09-15</td><td>Lovable registered the name as an empty placeholder and marked the report resolved</td></tr>
         </tbody>
       </table>
     </div>
 
     <p style="margin-top:22px">
-      The name now belongs to Lovable, and the package holds nothing but a README: no code, no
-      install scripts. A project that still carries the import now fetches Lovable's placeholder
-      instead of whatever a stranger might have published. We did not register the name at any
-      point.
+      The package is now an empty placeholder owned by Lovable, with just a README and no install
+      scripts, so nobody else can take the name. I never registered it myself.
     </p>
     <p>
-      Thanks to Lovable's security team for fixing it. The report is credited on
-      <a href="https://hackerone.com/lovable-vdp/thanks/2026">Lovable's HackerOne thanks page</a>.
+      Thanks to the Lovable security team for fixing it. They also credited the report on their
+      <a href="https://hackerone.com/lovable-vdp/thanks/2026">HackerOne thanks page</a>.
     </p>
 
     <div class="term" style="margin-top:26px">
-      <div class="term-bar"><i></i><i></i><i></i><span>verify it yourself</span></div>
+      <div class="term-bar"><i></i><i></i><i></i><span>check it yourself</span></div>
 <pre><span class="d">$</span> <span class="w">npm view lovable-agent-playwright-config</span> <span class="p">version description time.created</span>
 <span class="g">version = '0.0.0'</span>
 <span class="g">description = 'This package is not intended for use.'</span>
 <span class="g">time.created = '2026-09-15T10:10:18.192Z'</span></pre>
     </div>
 
-    <h3>Unpublished is not the same as squattable</h3>
+    <h3>Not every unpublished name can be taken</h3>
     <p>
-      Two other names the scan confirmed as unpublished were scoped packages, imported by example
-      projects inside the repository that uses them. Neither is squattable: the scope already has an
-      owner on npm, and only a scope's owner can publish under it.
+      Two other unpublished names in the scan were scoped packages, used by example projects in the
+      same repo. Those were never at risk: the scope already has an owner on npm, and only the owner
+      can publish packages under it.
     </p>
     <p>
-      That distinction is easy to miss. ghostimport v0.5.2 missed it too, and reported both names as
-      free to register. From v0.6.0 it checks whether a scope is owned before calling a scoped name
-      squattable.
+      ghostimport 0.5.2 got this wrong and flagged both as free to register. Since 0.6.0 it checks
+      whether a scope has an owner before saying that.
     </p>
   </section>
 
   <!-- Finding 3 -->
   <section>
     <p class="eyebrow">Finding 03</p>
-    <h2>What the corpus found in ghostimport itself</h2>
+    <h2>Most of the bugs were in my own tool</h2>
     <p>
-      A scanner that reports a problem in one popular repository out of four is not a security
-      tool, it is a nuisance. This corpus was the first time ghostimport had been pointed at a
-      large body of real-world code, and it did not come out of it well.
+      This was the first time I had run ghostimport on a lot of real code, and it didn't go well.
+      Version 0.5.1 flagged a missing package in almost one in five popular repos, and nearly all of
+      those were false alarms. A security tool that noisy just gets switched off.
     </p>
 
     <div class="table-scroll" style="margin-top:26px">
@@ -317,42 +309,41 @@ td .no { color: var(--breach); }
           <tr><th>Measure</th><th>v0.5.1</th><th>v0.5.2</th></tr>
         </thead>
         <tbody>
-          <tr><td>Established repos reporting a missing package</td><td class="no num">19.1%</td><td class="ok num">12.8%</td></tr>
-          <tr><td>AI-assisted repos reporting a missing package</td><td class="no num">11.8%</td><td class="ok num">5.5%</td></tr>
-          <tr><td>Distinct false names reported</td><td class="no num">55</td><td class="ok num">25</td></tr>
+          <tr><td>Established repos with a flagged package</td><td class="no num">19.1%</td><td class="ok num">12.8%</td></tr>
+          <tr><td>AI-assisted repos with a flagged package</td><td class="no num">11.8%</td><td class="ok num">5.5%</td></tr>
+          <tr><td>Distinct wrong names flagged</td><td class="no num">55</td><td class="ok num">25</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p style="margin-top:22px">Six causes, all fixed in v0.5.2:</p>
+    <p style="margin-top:22px">I traced the false alarms to six bugs, all fixed in 0.5.2:</p>
     <div class="table-scroll">
       <table>
-        <thead><tr><th>Cause</th><th>What it broke</th></tr></thead>
+        <thead><tr><th>Bug</th><th>What went wrong</th></tr></thead>
         <tbody>
-          <tr><td>Root-only config</td><td>A monorepo's nested <code>package.json</code> and <code>tsconfig.json</code> were invisible, so workspace packages looked missing</td></tr>
-          <tr><td>Scoped aliases</td><td>The alias <code>@commands</code> was stored, then compared against the import <code>@commands/types</code> — it could never match</td></tr>
-          <tr><td>Comment stripping</td><td>The JSONC parser ate <code>https://</code> inside strings, destroying every Deno import map it read</td></tr>
-          <tr><td>Framework scopes</td><td><code>@theme/*</code> and <code>@site/*</code> are resolved by Docusaurus, <code>@std/*</code> by Deno — none are npm names</td></tr>
-          <tr><td>Build output</td><td><code>.vercel</code> and friends were walked, so bundled vendor code was scanned as though someone had imported it</td></tr>
-          <tr><td>Non-JS specifiers</td><td><code>shared.dart</code> was parsed as a package name, because dots are legal in npm names</td></tr>
+          <tr><td>Root-only config</td><td>Nested <code>package.json</code> and <code>tsconfig.json</code> files in monorepos were ignored, so workspace packages looked missing</td></tr>
+          <tr><td>Scoped aliases</td><td>The alias <code>@commands</code> was compared against the full import <code>@commands/types</code>, so it never matched</td></tr>
+          <tr><td>Comment stripping</td><td>The JSONC parser removed <code>https://</code> inside strings, which broke every Deno import map it read</td></tr>
+          <tr><td>Framework scopes</td><td><code>@theme/*</code> and <code>@site/*</code> are handled by Docusaurus and <code>@std/*</code> by Deno, and none of them come from npm</td></tr>
+          <tr><td>Build output</td><td>Folders like <code>.vercel</code> were scanned, so bundled code looked like real imports</td></tr>
+          <tr><td>Non-JS files</td><td><code>shared.dart</code> was read as a package name, because dots are allowed in npm names</td></tr>
         </tbody>
       </table>
     </div>
 
     <p style="margin-top:22px">
-      Two thirds of what remains is deliberate: fake names inside test fixtures, in projects that
-      test import parsing. We chose not to suppress test directories. Agents write tests too, and
-      a hallucinated import in a test file is still a real one.
+      About two thirds of what still gets flagged is fake names in test fixtures, in projects that test
+      import parsing. I decided not to skip test folders. AI agents write tests too, and a made-up import
+      in a test file is still a made-up import.
     </p>
   </section>
 
   <!-- Scan log -->
   <section id="log">
     <p class="eyebrow">Scan log</p>
-    <h2>Every corpus run, and what it returned</h2>
+    <h2>Every scan behind these numbers</h2>
     <p>
-      Numbers on this site come from running the tool, not from estimating. This log records each
-      corpus scan behind the claims above, so any figure can be traced to a version and a date.
+      Each run, with the date and the tool version, so you can see where the figures above come from.
     </p>
 
     <div class="table-scroll" style="margin-top:26px">
@@ -365,40 +356,37 @@ td .no { color: var(--breach); }
             <td>2026-08-30</td>
             <td>174 repos · 23,773 files</td>
             <td>v0.5.2</td>
-            <td>25 names reported · <span class="ok">3 confirmed unpublished</span> · 1 squattable, since reserved by its vendor · 0 organic hallucinations</td>
+            <td>25 names flagged · <span class="ok">3 confirmed unpublished</span> · 1 that anyone could have registered, now reserved by Lovable · 0 organic hallucinations</td>
           </tr>
           <tr>
             <td>2026-08-29</td>
             <td>174 repos · 24,414 files</td>
             <td>v0.5.1</td>
-            <td>55 names reported · <span class="no">30 false positives traced to 6 causes</span></td>
+            <td>55 names flagged · <span class="no">30 false alarms traced to 6 bugs</span></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <h3>Reproduce it</h3>
+    <h3>Try it yourself</h3>
     <p>
-      None of this needs our data. Point the scanner at any repository and check the names it
-      reports against the registry yourself.
+      You don't need my data. Run the scanner on any repo and look up the names it flags on npm.
     </p>
 
     <div class="term" style="margin-top:20px">
       <div class="term-bar"><i></i><i></i><i></i><span>reproduce</span></div>
 <pre><span class="d">$</span> <span class="w">npx ghostimport@0.5.2</span> <span class="p">./some-repo</span> <span class="p">--json</span>
-<span class="d">$</span> <span class="w">npm view</span> <span class="p">&lt;name-it-reported&gt;</span>   <span class="c"># a 404 means the name is free</span></pre>
+<span class="d">$</span> <span class="w">npm view</span> <span class="p">&lt;name-it-flagged&gt;</span>   <span class="c"># a 404 means nobody has published it</span></pre>
     </div>
   </section>
 
   <!-- Close -->
   <section style="border-bottom:0">
-    <h2>If you ship templates, check the names they import</h2>
+    <h2>If you maintain a template, check its imports</h2>
     <p>
-      The Lovable name took one command to confirm, and one publish to fix.
-      Any scaffold, starter template, internal CLI or documentation example that emits an import is
-      publishing a claim on a package name. If that name is unregistered, anyone can answer the
-      claim. Checking takes one command per name, and it is worth running against every template
-      you ship.
+      Confirming the Lovable name took one command, and so did fixing it. Starter templates,
+      scaffolding tools and docs examples all put package names into other people's code. If one of
+      those names isn't registered, anyone can register it. Checking takes a minute.
     </p>
     <div class="cta-row" style="margin-top:28px">
       <a class="btn primary" href="../docs/">Run it on your project</a>
