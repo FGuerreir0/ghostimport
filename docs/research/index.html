@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Field Report — Hallucinated Imports in 174 Repositories</title>
-<meta name="description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, and the scan exposed six false-positive bugs in our own scanner.">
+<title>Field Report — 404 Repos Imported a Package Nobody Owned</title>
+<meta name="description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta name="keywords" content="slopsquatting research, hallucinated npm package study, supply chain security report, AI generated code">
 <meta name="author" content="Fábio Guerreiro">
 <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
@@ -14,12 +14,12 @@
 <meta property="og:type" content="article">
 <meta property="og:url" content="https://fguerreir0.github.io/ghostimport/research/">
 <meta property="og:site_name" content="ghostimport">
-<meta property="og:title" content="Field Report — Hallucinated Imports in 174 Repositories">
-<meta property="og:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, and the scan exposed six false-positive bugs in our own scanner.">
+<meta property="og:title" content="Field Report — 404 Repos Imported a Package Nobody Owned">
+<meta property="og:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Field Report — Hallucinated Imports in 174 Repositories">
-<meta name="twitter:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, and the scan exposed six false-positive bugs in our own scanner.">
+<meta name="twitter:title" content="Field Report — 404 Repos Imported a Package Nobody Owned">
+<meta name="twitter:description" content="We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.">
 <meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
 
 <!-- Structured data. Every figure below also appears in the page body. -->
@@ -27,9 +27,10 @@
 {
   "@context": "https://schema.org",
   "@type": "Report",
-  "headline": "Hallucinated npm imports do not survive to a public repository",
-  "description": "We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, and the scan exposed six false-positive bugs in our own scanner.",
+  "headline": "404 repositories imported an npm package nobody owned",
+  "description": "We scanned 174 public GitHub repositories for npm imports that resolve to nothing. No AI hallucination survived to a public repo, but one unregistered name shipped by Lovable's scaffold sat in 404 public repositories until Lovable reserved it.",
   "datePublished": "2026-09-13",
+  "dateModified": "2026-09-15",
   "inLanguage": "en",
   "url": "https://fguerreir0.github.io/ghostimport/research/",
   "author": { "@type": "Person", "name": "Fábio Guerreiro" },
@@ -107,16 +108,18 @@ td .no { color: var(--breach); }
 
   <header class="masthead">
     <p class="eyebrow">Field report</p>
-    <h1>Hallucinated imports don't survive to a public repository</h1>
+    <h1>404 repositories imported a package nobody owned</h1>
     <p class="lede">
       We scanned <strong>174 public GitHub repositories</strong> looking for npm imports that
-      resolve to nothing. The hallucinations we went looking for were not there. What the scan did
-      turn up is below: a null result, one finding held back under coordinated disclosure, and six
-      bugs in our own scanner.
+      resolve to nothing. The hallucinations we went looking for were not there. What we found
+      instead was a single name, emitted by an AI app builder into hundreds of repos, that
+      <strong>had never been published</strong> and was free for anyone to claim. We reported it,
+      and Lovable reserved the name 16 days later.
     </p>
     <div class="dateline">
       <span><b>Scanned</b> 2026-08-30</span>
       <span><b>Published</b> 2026-09-13</span>
+      <span><b>Updated</b> 2026-09-15</span>
       <span><b>Corpus</b> 174 repositories · 23,773 source files · 4,555 unique imports</span>
       <span><b>Tool</b> ghostimport v0.5.2</span>
     </div>
@@ -146,7 +149,7 @@ td .no { color: var(--breach); }
           </tr>
           <tr>
             <td>AI-assisted</td>
-            <td>Created after 2025-06, README says “vibe coded”, “built with Cursor”, or credits another AI coding tool</td>
+            <td>Created after 2025-06, README says “vibe coded”, “built with Lovable”, “built with Cursor”</td>
             <td class="num">127</td><td class="num">12,879</td>
           </tr>
         </tbody>
@@ -215,17 +218,75 @@ td .no { color: var(--breach); }
   <!-- Finding 2 -->
   <section>
     <p class="eyebrow">Finding 02</p>
-    <h2>Held back under coordinated disclosure</h2>
-    <p>
-      One result from this scan concerns a third-party product. We reported it privately on
-      2026-08-30 through the vendor's vulnerability disclosure program, and it has not been resolved
-      yet. Until it is, or until the program's disclosure terms allow it, this report publishes
-      nothing that describes it: not the product, not the affected files, not the scale.
+    <h2>One unregistered name, shipped by a code generator into hundreds of repos</h2>
+
+    <div class="figures">
+      <div class="fig phantom">
+        <div class="n">404</div>
+        <div class="l">Distinct public repos</div>
+        <div class="s">Imported the name when we scanned, across 657 file matches — the full result set, not a sample.</div>
+      </div>
+      <div class="fig">
+        <div class="n">16</div>
+        <div class="l">Days from report to fix</div>
+        <div class="s">Lovable reserved the name on 2026-09-15. It is no longer free to claim.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      <code>lovable-agent-playwright-config</code> was imported by
+      <code>playwright.config.ts</code> and <code>playwright-fixture.ts</code> in repository after
+      repository. Those two files were near-identical across projects that had nothing else in
+      common, which is the signature of a scaffold: they came from <strong>Lovable</strong>, an AI
+      app builder, in the projects it generates.
     </p>
     <p>
-      This section will be updated when that changes. We have not registered any package name found
-      in this scan, and will not.
+      When we scanned, the package did not exist on npm and never had. Code search returned 657 file
+      matches across <strong>404 distinct public repositories</strong>, every one in those two
+      filenames, at the repository root or under <code>frontend/</code> or <code>client/</code>.
+      Private repositories are not indexed, so the real number was higher.
     </p>
+
+    <h3>Why this shape is the dangerous one</h3>
+    <p>
+      A hallucination in one developer's file is a build error. A name baked into a generator's
+      template is a <strong>standing target</strong>: it is reproduced automatically, it looks
+      official because it carries the vendor's own prefix, and every project that has it waits on
+      the same unclaimed name. Registering it would have put attacker-controlled code one
+      <code>npm install</code> away from every one of those repositories, with a postinstall script
+      that runs before anybody reads a line of it.
+    </p>
+
+    <h3>Disclosure and fix</h3>
+    <div class="table-scroll" style="margin-top:14px">
+      <table>
+        <thead><tr><th>Date</th><th>What happened</th></tr></thead>
+        <tbody>
+          <tr><td>2026-08-30</td><td>Found in the corpus scan and reported privately through Lovable's vulnerability disclosure program on HackerOne</td></tr>
+          <tr><td>2026-09-13</td><td>This report published with the finding withheld: no product, no files, no scale</td></tr>
+          <tr><td>2026-09-15</td><td>Lovable registered the name as an empty placeholder and closed the report as resolved</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">
+      The name now belongs to Lovable, and the package holds nothing but a README: no code, no
+      install scripts. A project that still carries the import now fetches Lovable's placeholder
+      instead of whatever a stranger might have published. We did not register the name at any
+      point.
+    </p>
+    <p>
+      Thanks to Lovable's security team for fixing it. The report is credited on
+      <a href="https://hackerone.com/lovable-vdp/thanks/2026">Lovable's HackerOne thanks page</a>.
+    </p>
+
+    <div class="term" style="margin-top:26px">
+      <div class="term-bar"><i></i><i></i><i></i><span>verify it yourself</span></div>
+<pre><span class="d">$</span> <span class="w">npm view lovable-agent-playwright-config</span> <span class="p">version description time.created</span>
+<span class="g">version = '0.0.0'</span>
+<span class="g">description = 'This package is not intended for use.'</span>
+<span class="g">time.created = '2026-09-15T10:10:18.192Z'</span></pre>
+    </div>
 
     <h3>Unpublished is not the same as squattable</h3>
     <p>
@@ -304,7 +365,7 @@ td .no { color: var(--breach); }
             <td>2026-08-30</td>
             <td>174 repos · 23,773 files</td>
             <td>v0.5.2</td>
-            <td>25 names reported · <span class="ok">3 confirmed unpublished</span> · 1 held back under coordinated disclosure · 0 organic hallucinations</td>
+            <td>25 names reported · <span class="ok">3 confirmed unpublished</span> · 1 squattable, since reserved by its vendor · 0 organic hallucinations</td>
           </tr>
           <tr>
             <td>2026-08-29</td>
@@ -333,6 +394,7 @@ td .no { color: var(--breach); }
   <section style="border-bottom:0">
     <h2>If you ship templates, check the names they import</h2>
     <p>
+      The Lovable name took one command to confirm, and one publish to fix.
       Any scaffold, starter template, internal CLI or documentation example that emits an import is
       publishing a claim on a package name. If that name is unregistered, anyone can answer the
       claim. Checking takes one command per name, and it is worth running against every template

@@ -544,13 +544,13 @@ claude mcp add ghostimport \
     <div class="scanstats">
       <div class="stat"><div class="n">174</div><div class="l">Repos scanned</div></div>
       <div class="stat"><div class="n">0</div><div class="l">Organic hallucinations</div></div>
-      <div class="stat"><div class="n">4,555</div><div class="l">Unique imports checked</div></div>
+      <div class="stat phantom"><div class="n">404</div><div class="l">Repos importing a name nobody owned</div></div>
     </div>
 
     <p class="report-note">
       Nobody's hallucinated import survived to a public repo — the build catches those in
-      seconds. The window that matters is the minute <strong>before the commit</strong>, which is
-      where ghostimport runs.
+      seconds. But a name emitted by <strong>Lovable's</strong> scaffold into 404 public projects had
+      never been published to npm. We reported it, and Lovable reserved the name 16 days later.
     </p>
 
     <div class="cta-row" style="margin-top:24px">
