@@ -72,7 +72,7 @@ Add to `.claude/settings.json`:
 }
 ```
 
-- **`PreToolUse` on Bash** — reads any install command and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or ships an install script. This is the one that stops a real attack.
+- **`PreToolUse` on Bash** — reads any install command and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or runs an install script with no track record behind it. Established packages that ship one (`esbuild`, `puppeteer`) go through. This is the one that stops a real attack.
 - **`PostToolUse` on edits** — checks imports the agent just wrote, or dependencies it just added to a `package.json`, and tells it to fix them.
 
 The agent sees why it was stopped:
@@ -158,7 +158,7 @@ Optional `.ghostimportrc.json` in your project root:
 <summary>CI: GitHub Actions and pre-commit</summary>
 
 ```yaml
-- uses: FGuerreir0/ghostimport@v0.6.0
+- uses: FGuerreir0/ghostimport@v0.6.1
   with:
     path: '.'
 ```
@@ -170,7 +170,7 @@ For [pre-commit](https://pre-commit.com), in `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/FGuerreir0/ghostimport
-    rev: v0.6.0
+    rev: v0.6.1
     hooks:
       - id: ghostimport
 ```
@@ -242,14 +242,14 @@ Types are shipped with the package: `ScanResult`, `ScanOptions`, `MissingRef`, `
 
 | Signal | Weight | Why |
 |---|---|---|
-| `postinstall` / `preinstall` / `install` script | critical | Runs arbitrary code on `npm install` |
-| Name 1-2 chars from a popular package | critical | Classic typosquat |
+| Name 1-2 chars from a popular package, < 10k weekly downloads | critical | Classic typosquat. Established near names (`preact`, `redis`, `cypress`) aren't flagged |
+| `postinstall` / `preinstall` / `install` script | amplifier | Runs arbitrary code on `npm install`. Critical alongside any medium signal; normal on its own (`esbuild`, `puppeteer`) |
 | Created < 30 days ago | medium | No track record |
 | < 50 weekly downloads | medium | Near-zero adoption |
 | Single version published | medium | Abandoned or one-shot |
 | Single maintainer | amplifier | Only counts alongside another signal |
 
-`high` if any critical signal fires, or 2+ medium ones. Only `medium` and `high` are reported.
+`high` if any critical signal fires, or 2+ medium ones (a single maintainer counts as a second). Only `medium` and `high` are reported.
 
 A name that doesn't exist on npm is reported as squattable unless it sits in a scope someone already owns — only a scope's owner can publish under it, so `@babel/made-up` is a broken import but not a squatting target. That check costs at most one request per scope, so `--fast` doesn't disable it.
 

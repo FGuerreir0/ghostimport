@@ -84,7 +84,7 @@
           "name": "How do I stop my AI agent from installing a package that does not exist?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Run ghostimport as an agent hook. A PreToolUse hook on Bash inspects any npm, pnpm, yarn or bun install command and denies the tool call when a package does not exist, is a typosquat, or ships an install script. Unlike an MCP tool, a hook runs whether or not the model chooses to call it."
+            "text": "Run ghostimport as an agent hook. A PreToolUse hook on Bash inspects any npm, pnpm, yarn or bun install command and denies the tool call when a package does not exist, is a typosquat, or runs an install script with no track record behind it. Unlike an MCP tool, a hook runs whether or not the model chooses to call it."
           }
         }
       ]
@@ -496,14 +496,14 @@ claude mcp add ghostimport \
         </thead>
         <tbody>
           <tr>
-            <td>postinstall script</td>
+            <td>1–2 chars from a popular name, without adoption of its own</td>
             <td><span class="weight critical">Critical</span></td>
-            <td>Runs arbitrary code the moment the package lands</td>
+            <td>The classic typosquat shape. <code>preact</code> and <code>redis</code> are near popular names too, but millions of weekly installs make them no typosquat</td>
           </tr>
           <tr>
-            <td>1–2 chars from a popular name</td>
-            <td><span class="weight critical">Critical</span></td>
-            <td>The classic typosquat shape</td>
+            <td>postinstall script</td>
+            <td><span class="weight amp">Amplifier</span></td>
+            <td>Runs arbitrary code on install. Critical on a package with no track record; esbuild and puppeteer ship one too</td>
           </tr>
           <tr>
             <td>Created &lt; 30 days ago</td>
@@ -610,7 +610,7 @@ claude mcp add ghostimport \
         <p>
           Run ghostimport as an <a href="docs/#hooks">agent hook</a>. A <code>PreToolUse</code> hook
           on Bash inspects any install command and denies the tool call when a package doesn't
-          exist, is a typosquat, or ships an install script. Unlike an MCP tool, a hook runs whether
+          exist, is a typosquat, or runs an install script with no track record behind it. Unlike an MCP tool, a hook runs whether
           or not the model chooses to call it.
         </p>
       </div>

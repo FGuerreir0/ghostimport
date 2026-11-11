@@ -381,8 +381,9 @@ npm install --save-dev ghostimport</pre>
         <li>
           <strong>PreToolUse on Bash</strong> — parses any <code>npm</code>, <code>pnpm</code>,
           <code>yarn</code> or <code>bun</code> install command and <strong>denies the tool call</strong>
-          if it would fetch a package that doesn't exist, is a typosquat, or ships an install script.
-          This is the one that stops a real attack, because it fires before the postinstall could run.
+          if it would fetch a package that doesn't exist, is a typosquat, or runs an install script
+          with no track record behind it — established packages that ship one, like
+          <code>esbuild</code>, go through. This is the one that stops a real attack, because it fires before the postinstall could run.
         </li>
         <li>
           <strong>PostToolUse on edits</strong> — reads the file the agent just wrote, extracts its
@@ -685,8 +686,8 @@ ghostimport mcp | hook</pre>
         <table>
           <thead><tr><th>Signal</th><th>Weight</th><th>Why it matters</th></tr></thead>
           <tbody>
-            <tr><td>postinstall / preinstall / install script</td><td><span class="weight critical">Critical</span></td><td>Runs arbitrary code the moment the package lands</td></tr>
-            <tr><td>1–2 chars from a popular name</td><td><span class="weight critical">Critical</span></td><td>The classic typosquat shape</td></tr>
+            <tr><td>1–2 chars from a popular name, with &lt; 10k weekly downloads</td><td><span class="weight critical">Critical</span></td><td>The classic typosquat shape. Established near names like <code>preact</code>, <code>redis</code> and <code>cypress</code> are not flagged</td></tr>
+            <tr><td>postinstall / preinstall / install script</td><td><span class="weight amp">Amplifier</span></td><td>Runs arbitrary code on install. Critical alongside any medium signal; on its own it is normal (esbuild, puppeteer and core-js ship one)</td></tr>
             <tr><td>Created &lt; 30 days ago</td><td><span class="weight medium">Medium</span></td><td>No track record to judge it by</td></tr>
             <tr><td>&lt; 50 weekly downloads</td><td><span class="weight medium">Medium</span></td><td>Nobody else is depending on it</td></tr>
             <tr><td>Single version published</td><td><span class="weight medium">Medium</span></td><td>Abandoned, or published once for a reason</td></tr>
@@ -695,8 +696,8 @@ ghostimport mcp | hook</pre>
         </table>
       </div>
       <p>
-        Rated <strong>high</strong> if any critical signal fires or two medium ones do; only
-        <code>medium</code> and <code>high</code> are reported.
+        Rated <strong>high</strong> if any critical signal fires or two medium ones do (a single
+        maintainer counts as a second); only <code>medium</code> and <code>high</code> are reported.
       </p>
     </section>
 

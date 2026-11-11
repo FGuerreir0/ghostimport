@@ -81,10 +81,21 @@ const POPULAR_PACKAGES = [
   'socket.io',
 ] as const
 
+const POPULAR_SET: ReadonlySet<string> = new Set(POPULAR_PACKAGES)
+
+/**
+ * The popular package this name is 1-2 edits from, judged by the name alone.
+ *
+ * A name match is a hint, not a verdict: `preact`, `redis` and `cypress` are all
+ * close to a popular name and all legitimate. `checkPackageRisk` only treats a
+ * match as a typosquat when the package also has no adoption of its own.
+ */
 export function detectTyposquat(pkgName: string): string | null {
   const name = pkgName.startsWith('@') ? (pkgName.split('/')[1] ?? pkgName) : pkgName
   const lower = name.toLowerCase()
   if (lower.length < 5) return null
+  // Checked up front: otherwise `redux` matches `remix` before the loop reaches `redux`
+  if (POPULAR_SET.has(lower)) return null
   for (const popular of POPULAR_PACKAGES) {
     if (popular.length < 5) continue
     if (lower === popular) return null
@@ -170,6 +181,75 @@ export function checkScope(scope: string): Promise<{ owned: boolean | null; erro
 
 const INSTALL_HOOKS = new Set(['preinstall', 'install', 'postinstall'])
 
+/**
+ * Weekly downloads above which a package has a track record of its own. Typosquats
+ * live on accidental installs and stay far below this; the legitimate packages that
+ * sit near a popular name (`preact`, `redis`, `cypress`, `jsdoc`) are far above it.
+ */
+const ESTABLISHED_WEEKLY_DOWNLOADS = 10_000
+
+export interface RiskSignals {
+  /** Install-time lifecycle scripts in the latest version. */
+  installScripts: string[]
+  /** `detectTyposquat()` of the name — similarity alone, before adoption is considered. */
+  nearName: string | null
+  /** Days since the package was created; `Infinity` when unknown. */
+  ageDays: number
+  /** Last-week downloads; `null` when the downloads API did not answer. */
+  downloads: number | null
+  /** Published versions; `null` when unknown. */
+  versions: number | null
+  maintainers: number
+}
+
+export interface RiskScore {
+  risk: 'low' | 'medium' | 'high'
+  flags: string[]
+  /** The near name, kept only when the package has no adoption of its own. */
+  typosquatOf: string | null
+}
+
+/**
+ * Score a package's risk from its registry signals. Pure, so it can be tested
+ * without the network.
+ *
+ * - Trust deficits (medium): created < 30 days ago, < 50 weekly downloads, a single
+ *   version. A single maintainer counts only alongside one of those.
+ * - Critical: a typosquat (a near name on a package that is not established), or an
+ *   install script on a package with any trust deficit.
+ * - `high` on any critical signal or 2+ deficits; `medium` on one; else `low`.
+ *
+ * An install script alone is not a risk: esbuild, puppeteer and core-js all ship one.
+ * It is how a malicious package runs, so it turns a package with no track record from
+ * merely unproven into high risk.
+ */
+export function scoreRisk(s: RiskSignals): RiskScore {
+  const established =
+    (s.downloads !== null && s.downloads >= ESTABLISHED_WEEKLY_DOWNLOADS) ||
+    // Downloads API unavailable: fall back to a long, active history
+    (s.downloads === null && s.ageDays >= 365 && (s.versions ?? 0) >= 10)
+  const typosquatOf = established ? null : s.nearName
+
+  const deficits: string[] = []
+  if (s.ageDays < 30) deficits.push(`created ${s.ageDays} days ago`)
+  if (s.downloads !== null && s.downloads < 50) deficits.push(`${s.downloads} weekly downloads`)
+  if (s.versions !== null && s.versions <= 1) deficits.push('single version published')
+  // Only amplifies existing risk — a popular single-maintainer package (lodash, zod) is not suspicious alone
+  if (s.maintainers === 1 && deficits.length > 0) deficits.push('single maintainer')
+
+  const flags: string[] = []
+  if (s.installScripts.length > 0) flags.push(`has ${s.installScripts.join(', ')} script`)
+  if (typosquatOf) flags.push(`name is 1-2 chars from '${typosquatOf}'`)
+  flags.push(...deficits)
+
+  const critical = typosquatOf !== null || (s.installScripts.length > 0 && deficits.length > 0)
+  const risk: RiskScore['risk'] =
+    critical || deficits.length >= 2 ? 'high' :
+    deficits.length === 1 ? 'medium' : 'low'
+
+  return { risk, flags, typosquatOf }
+}
+
 /** Full supply-chain check for one package: registry metadata plus risk heuristics. */
 export async function checkPackageRisk(pkgName: string): Promise<PackageRiskResult> {
   const encoded = encodePackageName(pkgName)
@@ -193,27 +273,22 @@ export async function checkPackageRisk(pkgName: string): Promise<PackageRiskResu
     const installScripts = Object.keys(latestMeta?.scripts ?? {}).filter(k => INSTALL_HOOKS.has(k))
 
     const maintainers = meta.maintainers?.length ?? 0
-    const typosquatOf = detectTyposquat(pkgName)
+    const versions = meta.versions ? Object.keys(meta.versions).length : null
 
-    const flags: string[] = []
-    if (installScripts.length > 0) flags.push(`has ${installScripts.join(', ')} script`)
-    if (typosquatOf) flags.push(`name is 1-2 chars from '${typosquatOf}'`)
-    if (ageDays < 30) flags.push(`created ${ageDays} days ago`)
-    if (downloads !== null && downloads < 50) flags.push(`${downloads} weekly downloads`)
-    if (meta.versions && Object.keys(meta.versions).length <= 1) flags.push('single version published')
-    // Only amplifies existing risk — a popular single-maintainer package (lodash, zod) is not suspicious alone
-    if (maintainers === 1 && flags.length > 0) flags.push('single maintainer')
-
-    const risk: 'low' | 'medium' | 'high' =
-      installScripts.length > 0 || typosquatOf !== null ? 'high' :
-      flags.length >= 2 ? 'high' :
-      flags.length === 1 ? 'medium' : 'low'
+    const { risk, flags, typosquatOf } = scoreRisk({
+      installScripts,
+      nearName: detectTyposquat(pkgName),
+      ageDays,
+      downloads,
+      versions,
+      maintainers,
+    })
 
     return {
       exists: true,
       created: created?.toISOString().slice(0, 10) ?? 'unknown',
       downloads,
-      versions: meta.versions ? Object.keys(meta.versions).length : 0,
+      versions: versions ?? 0,
       risk,
       flags,
       installScripts,

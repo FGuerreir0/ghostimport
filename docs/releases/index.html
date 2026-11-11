@@ -92,12 +92,54 @@
     </p>
   </header>
 
+  <!-- v0.6.1 -->
+  <article class="release" id="v0.6.1">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.6.1">v0.6.1</a></div>
+      <div class="date">2026-11-11</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <p>
+        The install hook was blocking popular, legitimate packages. Two risk signals counted as
+        critical on their own, and both fire on packages with millions of weekly installs.
+      </p>
+      <h2>Fixes</h2>
+      <ul>
+        <li>
+          <strong>An install script alone no longer makes a package high risk.</strong>
+          <code>esbuild</code>, <code>puppeteer</code>, <code>core-js</code> and <code>cypress</code> all
+          ship one, so <code>npm install esbuild</code> was denied. A script is now critical only on a
+          package with no track record — created in the last 30 days, under 50 weekly downloads, or a
+          single version — which is the shape a malicious package actually has.
+        </li>
+        <li>
+          <strong>A name near a popular package is only a typosquat when it has no adoption of its
+          own.</strong> <code>preact</code>, <code>redis</code>, <code>mysql</code>, <code>jsdoc</code>
+          and <code>tslint</code> are all one or two characters from a popular name; at 10,000 weekly
+          downloads or more, a package is no longer flagged for it. <code>axois</code> and
+          <code>expresss</code> are still blocked.
+        </li>
+        <li>
+          <code>redux</code> and <code>bcryptjs</code> were matched against <code>remix</code> and
+          <code>bcrypt</code> before the exact-match check could see them. Popular names are now
+          exact-matched first.
+        </li>
+      </ul>
+      <h2>Upgrading</h2>
+      <ul>
+        <li>No API changes. With <code>deep: true</code>, <code>verifyPackages()</code> now reports
+          <code>typosquatOf: null</code> for an established package whose name merely resembles a
+          popular one.</li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.6.0 -->
   <article class="release" id="v0.6.0">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.6.0">v0.6.0</a></div>
       <div class="date">2026-09-13</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <h2>Checks</h2>

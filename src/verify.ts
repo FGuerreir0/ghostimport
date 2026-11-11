@@ -109,7 +109,11 @@ export async function verifyPackages(
   for (const verdict of verdicts) {
     if (verdict.status !== 'ok') continue
     const info = await checkPackageRisk(verdict.pkg)
-    if (info.exists !== true || info.risk === 'low') continue
+    if (info.exists !== true) continue
+    // The adoption-aware answer replaces the name-only hint: `preact` is near
+    // `react` by name, but with millions of weekly downloads it is no typosquat
+    verdict.typosquatOf = info.typosquatOf
+    if (info.risk === 'low') continue
     verdict.status = 'suspicious'
     verdict.risk = info.risk as 'medium' | 'high'
     verdict.flags = info.flags

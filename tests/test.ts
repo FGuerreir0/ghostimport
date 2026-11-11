@@ -9,7 +9,7 @@ import { loadCache, saveCache } from '../src/cache'
 import { hasBlockingVerdict, describeVerdict } from '../src/verify'
 import { specToPackageName } from '../src/install'
 import { readProjectContext, isResolvedLocally, registryDeps } from '../src/files'
-import { checkScope } from '../src/npm'
+import { checkScope, scoreRisk, type RiskSignals } from '../src/npm'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -183,6 +183,49 @@ assert(detectTyposquat('react') === null, 'returns null for exact match (react)'
 assert(detectTyposquat('pg') === null, 'returns null for names shorter than 5 chars')
 assert(detectTyposquat('zxcvbn') === null, 'returns null for unrelated names')
 assert(detectTyposquat('@types/reakt') === 'react', 'strips scope before comparing (@types/reakt → react)')
+assert(detectTyposquat('redux') === null, 'a popular name is exact-matched before near names (redux is not remix)')
+assert(detectTyposquat('bcryptjs') === null, 'a popular name is exact-matched before near names (bcryptjs is not bcrypt)')
+
+// ─── scoreRisk (pure) ────────────────────────────────────────────────────────
+
+console.log('\nscoreRisk()')
+
+// An established package: years old, many versions, heavy downloads, one maintainer
+const established: RiskSignals = {
+  installScripts: [], nearName: null, ageDays: 3000, downloads: 5_000_000, versions: 200, maintainers: 1,
+}
+// A package with no track record at all
+const fresh: RiskSignals = {
+  installScripts: [], nearName: null, ageDays: 3, downloads: 4, versions: 1, maintainers: 1,
+}
+
+assert(scoreRisk(established).risk === 'low', 'established package with no signals is low')
+assert(scoreRisk({ ...established, installScripts: ['postinstall'] }).risk === 'low',
+  'an install script alone does not raise an established package (esbuild, puppeteer, core-js)')
+assert(scoreRisk({ ...established, installScripts: ['postinstall'] }).flags.includes('has postinstall script'),
+  'the install script is still recorded in flags')
+assert(scoreRisk({ ...established, nearName: 'react' }).risk === 'low',
+  'a near name on an established package is not a typosquat (preact, redis, cypress)')
+assert(scoreRisk({ ...established, nearName: 'react' }).typosquatOf === null,
+  'an established near name reports typosquatOf: null')
+assert(scoreRisk({ ...established, downloads: null, nearName: 'react' }).typosquatOf === null,
+  'with the downloads API down, a long active history still counts as established')
+
+assert(scoreRisk({ ...established, downloads: 1245, nearName: 'axios' }).risk === 'high',
+  'a near name on a package without adoption is a typosquat → high')
+assert(scoreRisk({ ...established, downloads: 1245, nearName: 'axios' }).typosquatOf === 'axios',
+  'an unadopted near name reports typosquatOf')
+assert(scoreRisk({ ...established, ageDays: 10, maintainers: 3, installScripts: ['postinstall'] }).risk === 'high',
+  'an install script on a brand-new package is high')
+assert(scoreRisk({ ...established, versions: 1, maintainers: 3, installScripts: ['install'] }).risk === 'high',
+  'an install script on a single-version package is high')
+assert(scoreRisk({ ...established, ageDays: 10, maintainers: 3 }).risk === 'medium',
+  'one trust deficit without an install script is medium')
+assert(scoreRisk({ ...established, ageDays: 10 }).risk === 'high',
+  'one trust deficit plus a single maintainer is high')
+assert(scoreRisk(fresh).risk === 'high', 'several trust deficits are high')
+assert(scoreRisk({ ...established, ageDays: Infinity, versions: null, downloads: null }).risk === 'low',
+  'unknown age, versions and downloads raise nothing')
 
 // ─── checkScary (live) ───────────────────────────────────────────────────────
 
@@ -522,6 +565,17 @@ if (networkAvailable) {
     cwd: path.join(import.meta.dirname, '..'),
   })
   assert(allowed.code === 0, 'allows installing a real, low-risk package')
+
+  // Each of these was blocked before v0.6.1: install scripts (esbuild, puppeteer,
+  // core-js, cypress) and names near a popular package (redux, preact, redis)
+  const popular = await runHookProcess({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'npm install esbuild puppeteer core-js cypress redux preact redis' },
+    cwd: path.join(import.meta.dirname, '..'),
+  })
+  assert(popular.code === 0, 'allows popular packages that ship install scripts or sit near a popular name')
+  if (popular.code !== 0) console.error(popular.stderr)
 
   const hookTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostimport-hook-'))
   const badFile = path.join(hookTmp, 'bad.ts')
