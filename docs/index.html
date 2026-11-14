@@ -529,28 +529,31 @@ claude mcp add ghostimport \
   <!-- ── Field report ──────────────────────────────────── -->
   <section id="report">
     <div class="section-head">
-      <p class="eyebrow">Latest scan · 2026-08-30</p>
-      <h2>We ran it on 174 public repositories</h2>
+      <p class="eyebrow">Latest scan · 2026-11-14</p>
+      <h2>We ran it on 991 repos built with AI agents</h2>
       <p>
-        The most recent scan covered 174 repositories and 23,773 source files, and it did not
-        find what we went looking for.
+        649,213 source files, in repos that have a CLAUDE.md, AGENTS.md or Cursor rules file.
+        The code was clean. The instructions weren't.
       </p>
     </div>
 
     <div class="scanstats">
-      <div class="stat"><div class="n">174</div><div class="l">Repos scanned</div></div>
-      <div class="stat"><div class="n">0</div><div class="l">Organic hallucinations</div></div>
-      <div class="stat phantom"><div class="n">404</div><div class="l">Repos importing a name nobody owned</div></div>
+      <div class="stat"><div class="n">991</div><div class="l">Repos scanned</div></div>
+      <div class="stat"><div class="n">0</div><div class="l">Made-up imports in the code</div></div>
+      <div class="stat phantom"><div class="n">560</div><div class="l">Names in their commands that aren't on npm</div></div>
     </div>
 
     <p class="report-note">
-      Nobody's hallucinated import survived to a public repo — the build catches those in
-      seconds. But a name emitted by <strong>Lovable's</strong> scaffold into 404 public projects had
-      never been published to npm. We reported it, and Lovable reserved the name 16 days later.
+      Made-up imports don't survive to a public repo, because the build catches them in seconds.
+      The install and run commands in READMEs and <strong>agent instruction files</strong> are
+      different: nothing checks them until an agent runs them. In August, an earlier scan found a
+      name in <strong>Lovable's</strong> scaffold that 404 projects imported and nobody owned.
+      Lovable reserved it 16 days after our report.
     </p>
 
     <div class="cta-row" style="margin-top:24px">
-      <a class="btn primary" href="research/">Read the field report</a>
+      <a class="btn primary" href="research/agent-commands/">Read the new report</a>
+      <a class="btn" href="research/">The Lovable report</a>
     </div>
   </section>
 

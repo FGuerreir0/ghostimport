@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Field Report — The Made-Up Names Are in the Instructions</title>
+<meta name="description" content="I scanned 991 public repos built with AI coding agents. Their code imported no made-up packages. Their docs and agent instruction files told readers, and agents, to install or run 560 package names that aren't on npm.">
+<meta name="keywords" content="slopsquatting research, AI agent instructions, CLAUDE.md, AGENTS.md, npx, dependency confusion, hallucinated npm package">
+<meta name="author" content="Fábio Guerreiro">
+<link rel="icon" type="image/svg+xml" href="../../assets/favicon.svg">
+<link rel="icon" type="image/png" href="../../assets/logo.png">
+<link rel="apple-touch-icon" href="../../assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/research/agent-commands/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/research/agent-commands/">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:title" content="Field Report — The Made-Up Names Are in the Instructions">
+<meta property="og:description" content="991 public repos built with AI coding agents. No made-up imports in the code, but 560 package names in their install and run commands that aren't on npm.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ghostimport: Your AI invents a package name. Someone registers it. A dashed card shows an unregistered name, a solid card a real package.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Field Report — The Made-Up Names Are in the Instructions">
+<meta name="twitter:description" content="991 public repos built with AI coding agents. No made-up imports in the code, but 560 package names in their install and run commands that aren't on npm.">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+
+<!-- Structured data. Every figure below also appears in the page body. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Report",
+  "headline": "The made-up package names are in the instructions, not the code",
+  "description": "I scanned 991 public repos built with AI coding agents. Their code imported no made-up packages. Their docs and agent instruction files told readers, and agents, to install or run 560 package names that aren't on npm.",
+  "datePublished": "2026-11-14",
+  "inLanguage": "en",
+  "url": "https://fguerreir0.github.io/ghostimport/research/agent-commands/",
+  "author": { "@type": "Person", "name": "Fábio Guerreiro" },
+  "about": { "@type": "SoftwareApplication", "name": "ghostimport", "applicationCategory": "DeveloperApplication" },
+  "keywords": "slopsquatting, AI agent instructions, npx, dependency confusion, supply chain security"
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../../assets/site.css">
+
+<style>
+/* Page-specific layout only, same as the first field report. Identity lives in site.css. */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 26px 0 0; font-family: var(--mono); font-size: 13px;
+}
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a:hover { color: var(--phantom); }
+.topbar .home { display: inline-flex; align-items: center; gap: 9px; color: var(--bone); }
+.topbar .home img { width: 24px; height: 24px; }
+
+.masthead { padding: 54px 0 40px; border-bottom: 1px solid var(--line-soft); }
+.masthead h1 { font-size: clamp(34px, 5.6vw, 58px); max-width: 20ch; }
+.masthead .lede { font-size: 19px; color: var(--muted); max-width: var(--prose); margin: 20px 0 0; }
+.masthead .lede strong { color: var(--bone); font-weight: 600; }
+
+.dateline {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px;
+  font-family: var(--mono); font-size: 12px; color: var(--faint);
+}
+.dateline b { color: var(--muted); font-weight: 500; }
+
+section { padding: 52px 0; border-bottom: 1px solid var(--line-soft); }
+section h2 { font-size: clamp(25px, 3.4vw, 34px); max-width: 24ch; }
+section p, section li { max-width: var(--prose); color: var(--muted); }
+section p strong, section li strong { color: var(--bone); font-weight: 600; }
+section h3 { font-size: 19px; margin: 34px 0 10px; color: var(--bone); }
+section ul { padding-left: 20px; }
+section li { margin: 8px 0; }
+
+/* Dashed frame = a name nobody owns, per the site motif. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 30px 0 8px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 22px; }
+.fig.phantom { border-style: dashed; border-color: var(--phantom-d); background: rgba(168,168,240,.05); }
+.fig .n { font-family: var(--display); font-size: 40px; font-weight: 700; line-height: 1; color: var(--bone); letter-spacing: -.03em; }
+.fig.phantom .n { color: var(--phantom); }
+.fig .l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 12px; }
+.fig .s { font-size: 14px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+
+.callout {
+  border-left: 3px solid var(--phantom-d); background: rgba(168,168,240,.05);
+  padding: 18px 22px; border-radius: 0 10px 10px 0; margin: 28px 0;
+}
+.callout p { margin: 0; color: var(--bone); max-width: none; }
+
+td .ok { color: var(--safe); }
+td .no { color: var(--breach); }
+.num { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+  .masthead { padding: 34px 0 28px; }
+  section { padding: 38px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="topbar">
+    <a class="home" href="../../"><img src="../../assets/logo.png" alt="">ghostimport</a>
+    <span><a href="../">First report</a> &nbsp; <a href="../../docs/">Docs</a> &nbsp; <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a></span>
+  </nav>
+
+  <header class="masthead">
+    <p class="eyebrow">Field report · 2</p>
+    <h1>The made-up package names are in the instructions, not the code</h1>
+    <p class="lede">
+      I scanned 991 public repos built with AI coding agents. Like last time, their code didn't
+      import a single made-up package. But their READMEs and agent instruction files contain
+      <strong>50,301 install and run commands</strong>, and <strong>560 of the package names in
+      them aren't on npm</strong>. Coding agents read those files and run those commands.
+    </p>
+    <div class="dateline">
+      <span><b>Scanned</b> 2026-11-14</span>
+      <span><b>Published</b> 2026-11-14</span>
+      <span><b>Corpus</b> 991 repositories · 649,213 source files</span>
+      <span><b>Tool</b> ghostimport v0.7.1, rescored with v0.7.2</span>
+    </div>
+  </header>
+
+  <!-- Method -->
+  <section>
+    <p class="eyebrow">Method</p>
+    <h2>How I picked the repos</h2>
+    <p>
+      The <a href="../">first report</a> looked at 174 repos. This time I wanted a bigger sample,
+      and repos where I could be sure an AI agent was involved. So I used GitHub code search to
+      find repos that contain an agent instruction file, which is the file a coding agent reads
+      before it starts working.
+    </p>
+
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead><tr><th>Marker</th><th>Read by</th><th class="num">Repos</th></tr></thead>
+        <tbody>
+          <tr><td><code>AGENTS.md</code></td><td>Codex, Cursor, Copilot and others</td><td class="num">330</td></tr>
+          <tr><td><code>CLAUDE.md</code></td><td>Claude Code</td><td class="num">321</td></tr>
+          <tr><td><code>.cursor/rules</code>, <code>.cursorrules</code></td><td>Cursor</td><td class="num">162</td></tr>
+          <tr><td><code>.windsurfrules</code></td><td>Windsurf</td><td class="num">77</td></tr>
+          <tr><td><code>.github/copilot-instructions.md</code></td><td>GitHub Copilot</td><td class="num">53</td></tr>
+          <tr><td><code>GEMINI.md</code></td><td>Gemini CLI</td><td class="num">41</td></tr>
+          <tr><td><code>lovable-tagger</code> in package.json</td><td>Lovable projects</td><td class="num">23</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:14px">A repo can have more than one marker.</p>
+
+    <p style="margin-top:22px">
+      Code search found 11,220 repos. I kept the JavaScript and TypeScript ones that weren't forks
+      or archived, and took the top 1,000 by stars. 991 scanned cleanly. These are mostly small
+      projects: the median has 13 stars, and only 31 have more than 1,000. That's what code search
+      returns, not a sample of the most popular repos on GitHub.
+    </p>
+
+    <p>For each repo I did two things:</p>
+    <ul>
+      <li><strong>Imports.</strong> Ran <code>ghostimport --json</code> on the code, like in the
+        first report.</li>
+      <li><strong>Commands.</strong> Pulled every <code>npm</code>, <code>npx</code>,
+        <code>pnpm</code>, <code>yarn</code> and <code>bun</code> command out of code blocks in
+        Markdown files, agent instruction files and <code>package.json</code> scripts. Then I worked
+        out which packages each command would install or run, using the same parser as the
+        ghostimport agent hook, and looked every name up on npm.</li>
+    </ul>
+
+    <p>
+      I only used public data: the GitHub API and the public npm registry. Nothing from these repos
+      was executed, I didn't register any package names, and I'm not naming any repo.
+    </p>
+  </section>
+
+  <!-- Finding 1 -->
+  <section>
+    <p class="eyebrow">Finding 01</p>
+    <h2>Still no made-up imports in committed code</h2>
+
+    <div class="figures">
+      <div class="fig">
+        <div class="n">0</div>
+        <div class="l">Organic hallucinations</div>
+        <div class="s">Across 991 repos and 649,213 source files.</div>
+      </div>
+      <div class="fig">
+        <div class="n">166</div>
+        <div class="l">Repos with a flagged import</div>
+        <div class="s">I opened every flagged name outside test folders. None was a made-up import.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      Same result as in August, now with almost six times as many repos. When an AI makes up an
+      import, the build fails the first time someone runs it, so it gets fixed before anyone
+      commits.
+    </p>
+    <p>
+      Outside test folders, ghostimport flagged 141 names as missing from npm and free to register.
+      I opened each one where it was imported:
+    </p>
+
+    <div class="table-scroll" style="margin-top:22px">
+      <table>
+        <thead><tr><th>What it actually was</th><th class="num">Names</th></tr></thead>
+        <tbody>
+          <tr><td>Not an import: an example in a comment, text in a string, or a method that happens to be called <code>require</code></td><td class="num">53</td></tr>
+          <tr><td>An alias set up in the bundler or <code>tsconfig.json</code> that ghostimport didn't follow</td><td class="num">33</td></tr>
+          <tr><td>Test fixtures and benchmarks the folder filter missed</td><td class="num">30</td></tr>
+          <tr><td>A dependency installed from GitHub, a tarball or under another name (<code>"zod-3": "npm:zod@…"</code>)</td><td class="num">15</td></tr>
+          <tr><td>A module provided by the host app or generated at build time</td><td class="num">9</td></tr>
+          <tr><td><code>estree</code>, imported for its types, which come from <code>@types/estree</code></td><td class="num">1</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">
+      So every one was a false alarm, and most of them are ghostimport's fault. The four biggest
+      causes are listed under Finding 04.
+    </p>
+  </section>
+
+  <!-- Finding 2 -->
+  <section>
+    <p class="eyebrow">Finding 02</p>
+    <h2>The commands in docs and agent files name packages that don't exist</h2>
+
+    <div class="figures">
+      <div class="fig">
+        <div class="n">50,301</div>
+        <div class="l">Package names in commands</div>
+        <div class="s">In 759 repos. 4,871 different names.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">560</div>
+        <div class="l">Names not on npm</div>
+        <div class="s">In 156 repos. 451 in install commands, 128 in <code>npx</code>-style runs (some in both).</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">32</div>
+        <div class="l">In agent instruction files</div>
+        <div class="s">In 24 repos. These are the ones an agent reads before it starts.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      Most of the 560 are harmless once you look at them. They are placeholders like
+      <code>your-cli-package-name</code>, packages a monorepo README tells you to install before
+      they've been published, and sentences that just happen to start with <code>npm</code>.
+    </p>
+    <p>
+      But a person reads <code>your-cli-package-name</code> and knows it's an example. An agent
+      that has been told to follow the README might just run it. And some of the names look exactly
+      like what a model would invent:
+    </p>
+    <ul>
+      <li>
+        <strong><code>npm install -g opencode</code></strong> appears in 8 repos, all in a copied
+        agent template. The real package is <code>opencode-ai</code>. This one can't be abused:
+        a package called <code>open-code</code> already exists, and npm doesn't let anyone register
+        a name that differs from an existing one only by punctuation.
+      </li>
+      <li>
+        A <code>.cursorrules</code> file in 2 repos tells the agent to install a package that has
+        never existed. The functionality lives under a subpath of a different package. I'm not
+        naming it, because when I checked, anyone could still register it.
+      </li>
+    </ul>
+
+    <div class="callout">
+      <p>
+        ghostimport says up to 321 of the missing names could be registered by anyone, 18 of them
+        in agent instruction files. That's an upper bound: ghostimport doesn't check npm's
+        punctuation rule yet, and <code>opencode</code> shows that it matters. I'm not publishing
+        the list.
+      </p>
+    </div>
+  </section>
+
+  <!-- Finding 3 -->
+  <section>
+    <p class="eyebrow">Finding 03</p>
+    <h2>Command names aren't package names, and someone has noticed</h2>
+    <p>
+      <code>npx foo</code> first looks for a command called <code>foo</code> in the project's
+      installed packages. If there isn't one, for example in a fresh clone before
+      <code>npm install</code>, it downloads and runs the npm package called <code>foo</code>.
+      Many tools install a command whose name differs from the package name, so docs that say
+      <code>npx foo</code> work on the author's machine and fetch something else everywhere else.
+    </p>
+
+    <div class="table-scroll" style="margin-top:22px">
+      <table>
+        <thead><tr><th>Command in docs</th><th>The tool it means</th><th>What <code>npx</code> fetches without it</th><th class="num">Repos</th></tr></thead>
+        <tbody>
+          <tr><td><code>npx jsdoc2md</code></td><td>jsdoc-to-markdown</td><td>A placeholder that prints a warning</td><td class="num">4</td></tr>
+          <tr><td><code>npx depcruise</code></td><td>dependency-cruiser</td><td>A placeholder that prints a warning</td><td class="num">3</td></tr>
+          <tr><td><code>npx cucumber-js</code></td><td>@cucumber/cucumber</td><td>A placeholder that prints a warning</td><td class="num">2</td></tr>
+          <tr><td><code>npx eas</code></td><td>eas-cli</td><td>An unrelated templating library from 2017, by another author</td><td class="num">3</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:22px">
+      The three placeholders were registered in July 2025 "to prevent dependency confusion". Their
+      README points to Aikido Security's threat intelligence. I read their code and didn't run it:
+      it only prints a warning. So someone is already registering these names before attackers do.
+      That's good, but it only covers the names someone has spotted.
+    </p>
+    <p>
+      ghostimport rates all four as high risk. Since 0.7 its agent hook also checks
+      <code>npx</code>, <code>dlx</code> and <code>bunx</code> runs, so it blocks these commands
+      and tells the agent to find the real tool.
+    </p>
+  </section>
+
+  <!-- Finding 4 -->
+  <section>
+    <p class="eyebrow">Finding 04</p>
+    <h2>The scan found six bugs in ghostimport</h2>
+    <p>
+      Like in August, running the tool on real code found problems the tests didn't. The worst
+      one would have made the agent hook block ordinary commands: it read
+      <code>npm install   # Install dependencies</code> as a request to install two packages,
+      <code>Install</code> and <code>dependencies</code>.
+    </p>
+
+    <div class="table-scroll" style="margin-top:22px">
+      <table>
+        <thead><tr><th>Bug</th><th>What went wrong</th></tr></thead>
+        <tbody>
+          <tr><td>Shell comments</td><td>Words after <code>#</code> were read as package names</td></tr>
+          <tr><td>Flag values</td><td>The value after <code>--filter</code>, <code>-w</code>, <code>--prefix</code> and similar flags was read as a package name</td></tr>
+          <tr><td>Local specs</td><td><code>pkg@workspace:*</code>, <code>link:</code>, <code>file:</code> and <code>portal:</code> were treated as downloads from npm</td></tr>
+          <tr><td>Widely used packages</td><td>A package with millions of weekly downloads was rated high risk for having one version and one maintainer</td></tr>
+          <tr><td>Scoped names</td><td><code>@ai-sdk/codemod</code> was flagged as a typosquat of <code>nodemon</code></td></tr>
+          <tr><td>Capital letters</td><td>Names with capitals were reported as free to register, but npm doesn't accept new names with capitals</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-scroll" style="margin-top:22px">
+      <table>
+        <thead><tr><th>Command names flagged</th><th>v0.7.1</th><th>v0.7.2</th></tr></thead>
+        <tbody>
+          <tr><td>Not on npm</td><td class="no num">854 in 228 repos</td><td class="ok num">560 in 156 repos</td></tr>
+          <tr><td>Reported as free to register</td><td class="no num">620</td><td class="ok num">321</td></tr>
+          <tr><td>Published, rated high risk</td><td class="no num">320</td><td class="ok num">162</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:22px">All six are fixed in 0.7.2, each with a test.</p>
+
+    <h3>Still not fixed</h3>
+    <ul>
+      <li>Import statements inside comments and strings are reported as imports.</li>
+      <li><code>something.require("x")</code> is read as a <code>require</code> call.</li>
+      <li>Dependencies installed from GitHub, a tarball or under an alias
+        (<code>npm:</code>, <code>github:</code>, <code>file:</code>) are looked up on npm and
+        reported as missing.</li>
+      <li>The "free to register" check ignores npm's punctuation rule, so it overcounts.</li>
+      <li>Type-only imports of packages that exist only as <code>@types/*</code>, like
+        <code>estree</code>, are reported as missing.</li>
+      <li>When npm's downloads API doesn't answer, which happens on big runs, old single-version
+        packages fall to high risk. In the agent hook, that means a block the agent has to explain to you.</li>
+    </ul>
+  </section>
+
+  <!-- Scan log -->
+  <section id="log">
+    <p class="eyebrow">Scan log</p>
+    <h2>Every scan behind these numbers</h2>
+
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Corpus</th><th>Version</th><th>Result</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2026-11-14</td>
+            <td>991 agent-built repos · 649,213 files</td>
+            <td>v0.7.2</td>
+            <td>0 organic hallucinated imports · <span class="ok">560 command names not on npm</span>, 32 in agent files</td>
+          </tr>
+          <tr>
+            <td>2026-11-14</td>
+            <td>Same</td>
+            <td>v0.7.1</td>
+            <td>854 command names not on npm · <span class="no">6 bugs found, fixed in 0.7.2</span></td>
+          </tr>
+          <tr>
+            <td>2026-08-30</td>
+            <td>174 repos · 23,773 files</td>
+            <td>v0.5.2</td>
+            <td>0 organic hallucinations · 1 name anyone could have registered, now reserved by Lovable · <a href="../">report</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Check your own repo</h3>
+    <p>
+      You don't need my data. Scan your code, then look up the names in the install and
+      <code>npx</code> commands in your README and agent files.
+    </p>
+    <div class="term" style="margin-top:20px">
+      <div class="term-bar"><i></i><i></i><i></i><span>check it yourself</span></div>
+<pre><span class="d">$</span> <span class="w">npx ghostimport@0.7.2</span> <span class="p">./your-repo</span>
+<span class="d">$</span> <span class="w">npm view</span> <span class="p">&lt;name-from-a-command&gt;</span>   <span class="c"># a 404 means nobody has published it</span></pre>
+    </div>
+  </section>
+
+  <!-- Close -->
+  <section style="border-bottom:0">
+    <h2>If you write agent instructions, check the commands in them</h2>
+    <p>
+      An agent instruction file is a script someone else's agent will run. Every <code>npx</code>
+      line in it should name the package that's on npm, not the command it installs, and every
+      install line should name a package that exists. If you use Claude Code, the ghostimport
+      hook checks each command before the agent runs it.
+    </p>
+    <div class="cta-row" style="margin-top:28px">
+      <a class="btn primary" href="../../docs/">Set up the hook</a>
+      <a class="btn" href="../">Read the first report</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="../../">Home</a>
+    <a href="../../docs/">Docs</a>
+    <a href="../../releases/">Releases</a>
+    <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
+    <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+    <a href="https://buymeacoffee.com/fabioguerreiro">Buy me a coffee</a>
+  </footer>
+
+</div>
+
+</body>
+</html>
