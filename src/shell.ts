@@ -64,6 +64,13 @@ export function splitCommands(command: string, dialect: ShellDialect = 'posix'):
       continue
     }
 
+    // A `#` that starts a word comments out the rest of the line, in both dialects.
+    // `npm install  # install deps` must not read `install` and `deps` as packages.
+    if (ch === '#' && !inToken) {
+      while (i < command.length && command[i] !== '\n') i++
+      continue
+    }
+
     if (ch === escape && i + 1 < command.length) {
       // A backslash-newline continues the line; any other escaped character is literal
       if (command[i + 1] !== '\n') current += command[i + 1]

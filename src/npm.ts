@@ -91,13 +91,16 @@ const POPULAR_SET: ReadonlySet<string> = new Set(POPULAR_PACKAGES)
  * match as a typosquat when the package also has no adoption of its own.
  */
 export function detectTyposquat(pkgName: string): string | null {
-  const name = pkgName.startsWith('@') ? (pkgName.split('/')[1] ?? pkgName) : pkgName
-  const lower = name.toLowerCase()
+  // `@types/*` mirrors unscoped names, so `@types/reakt` is compared as `reakt`. Any
+  // other scoped name is compared whole, with scoped names only: matching the part after
+  // the slash flagged `@ai-sdk/codemod` as a typosquat of `nodemon`.
+  const lower = (pkgName.startsWith('@types/') ? pkgName.slice('@types/'.length) : pkgName).toLowerCase()
   if (lower.length < 5) return null
   // Checked up front: otherwise `redux` matches `remix` before the loop reaches `redux`
   if (POPULAR_SET.has(lower)) return null
+  const scoped = lower.startsWith('@')
   for (const popular of POPULAR_PACKAGES) {
-    if (popular.length < 5) continue
+    if (popular.length < 5 || popular.startsWith('@') !== scoped) continue
     if (lower === popular) return null
     if (levenshtein(lower, popular) <= 2) return popular
   }
@@ -243,7 +246,12 @@ export function scoreRisk(s: RiskSignals): RiskScore {
   flags.push(...deficits)
 
   const critical = typosquatOf !== null || (s.installScripts.length > 0 && deficits.length > 0)
+  // Real adoption outweighs a thin publish history: `server-only` has one version, one
+  // maintainer and 30M+ weekly downloads. It does not outweigh being brand new, or an
+  // install script on a single version.
+  const thinHistoryOnly = established && s.ageDays >= 30 && s.installScripts.length === 0
   const risk: RiskScore['risk'] =
+    thinHistoryOnly ? 'low' :
     critical || deficits.length >= 2 ? 'high' :
     deficits.length === 1 ? 'medium' : 'low'
 

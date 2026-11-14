@@ -95,12 +95,67 @@
     </p>
   </header>
 
+  <!-- v0.7.2 -->
+  <article class="release" id="v0.7.2">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.2">v0.7.2</a></div>
+      <div class="date">2026-11-14</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <p>
+        False-positive fixes, found by running ghostimport over 1,000 public repositories built with
+        AI coding agents and reading every command their docs, agent instructions and npm scripts ask
+        an agent to run.
+      </p>
+      <h2>Agent hook and command reader</h2>
+      <ul>
+        <li>
+          <strong>A <code>#</code> comment is no longer read as packages.</strong>
+          <code>npm install  # Install dependencies</code> made the hook look up <code>Install</code> and
+          <code>dependencies</code>, and block a perfectly ordinary command. This was the largest source of
+          noise in the corpus.
+        </li>
+        <li>
+          The values of install options are no longer read as packages:
+          <code>pnpm add -D x --filter @acme/web</code>, <code>npm i -w @org/app zod</code>,
+          <code>--workspace</code>, <code>--prefix</code>, <code>--tag</code>.
+        </li>
+        <li>
+          Specs that resolve inside the repo or on disk (<code>@acme/sdk@workspace:*</code>,
+          <code>link:</code>, <code>file:</code>, <code>portal:</code>) are no longer checked against npm.
+        </li>
+      </ul>
+      <h2>Risk scoring</h2>
+      <ul>
+        <li>
+          <strong>An established package is no longer high risk for a short publish history.</strong>
+          <code>server-only</code> has one version, one maintainer and over 30 million weekly downloads.
+          Real adoption now outweighs a single version or maintainer, though not a package created in the
+          last 30 days or an install script.
+        </li>
+        <li>
+          Scoped names are no longer typosquat-matched by the part after the slash
+          (<code>@ai-sdk/codemod</code> was flagged as near <code>nodemon</code>). <code>@types/*</code>
+          names still are, since they mirror the package they type.
+        </li>
+        <li>
+          A missing name with capital letters is no longer reported as claimable: npm rejects new
+          package names with capitals.
+        </li>
+      </ul>
+      <h2>Upgrading</h2>
+      <ul>
+        <li>No API changes. Plugin users: update the plugin in <code>/plugin</code> and start a new session.</li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.7.1 -->
   <article class="release" id="v0.7.1">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.1">v0.7.1</a></div>
       <div class="date">2026-11-14</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <p>

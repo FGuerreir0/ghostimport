@@ -183,7 +183,8 @@ assert(detectTyposquat('lodash') === null, 'returns null for exact match (lodash
 assert(detectTyposquat('react') === null, 'returns null for exact match (react)')
 assert(detectTyposquat('pg') === null, 'returns null for names shorter than 5 chars')
 assert(detectTyposquat('zxcvbn') === null, 'returns null for unrelated names')
-assert(detectTyposquat('@types/reakt') === 'react', 'strips scope before comparing (@types/reakt → react)')
+assert(detectTyposquat('@types/reakt') === 'react', 'compares @types names as the package they type (@types/reakt → react)')
+assert(detectTyposquat('@ai-sdk/codemod') === null, 'other scoped names are not compared by their unscoped part (not nodemon)')
 assert(detectTyposquat('redux') === null, 'a popular name is exact-matched before near names (redux is not remix)')
 assert(detectTyposquat('bcryptjs') === null, 'a popular name is exact-matched before near names (bcryptjs is not bcrypt)')
 
@@ -225,6 +226,8 @@ assert(scoreRisk({ ...established, ageDays: 10, maintainers: 3 }).risk === 'medi
 assert(scoreRisk({ ...established, ageDays: 10 }).risk === 'high',
   'one trust deficit plus a single maintainer is high')
 assert(scoreRisk(fresh).risk === 'high', 'several trust deficits are high')
+assert(scoreRisk({ ...established, versions: 1, maintainers: 1 }).risk === 'low',
+  'an established package with one version and one maintainer is low (server-only)')
 assert(scoreRisk({ ...established, ageDays: Infinity, versions: null, downloads: null }).risk === 'low',
   'unknown age, versions and downloads raise nothing')
 
@@ -338,6 +341,14 @@ const commandCases: Array<[string, string, string]> = [
   ['npx ./x.js', '', 'npx of a local file'],
   [`pwsh -Command "npm i zod"`, 'install:zod', 'pwsh -Command script'],
   ['sudo -E npm i -g pm2', 'install:pm2', 'sudo with flags'],
+  ['npm install   # Install dependencies', '', 'a # comment is not a package list'],
+  ['pnpm add -D @types/x --filter @acme/web', 'install:@types/x', 'install --filter value is a workspace'],
+  ['npm i -w @org/app zod', 'install:zod', 'install -w value is a workspace'],
+  ['pnpm add @acme/sdk@workspace:* zod', 'install:zod', 'workspace: protocol is local'],
+  ['pnpm install --filter web...', '', 'pnpm filter selector is not a package'],
+  ['npm i zod # the validator\nnpx tsx a.ts', 'exec:tsx install:zod', 'a comment ends at the newline'],
+  ['npm i "#x" zod', 'install:zod', 'a quoted # does not start a comment'],
+  ['npm i x#y zod', 'install:zod', 'a # inside a word does not start a comment'],
 ]
 for (const [command, expected, label] of commandCases) {
   const got = cmd(command)

@@ -34,6 +34,11 @@ export async function checkClaimable(
 
   const claimable = new Map<string, boolean | null>()
   for (const pkg of pkgs) {
+    // npm rejects new names with capital letters, so nobody can take `Install` or `@AIRoute/x`
+    if (pkg !== pkg.toLowerCase()) {
+      claimable.set(pkg, false)
+      continue
+    }
     if (!pkg.startsWith('@')) {
       claimable.set(pkg, true)
       continue

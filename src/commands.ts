@@ -178,9 +178,21 @@ export function specToPackageName(spec: string): string | null {
   return VALID_SEGMENT.test(name.toLowerCase()) ? name : null
 }
 
+// Install options whose value is a workspace, directory or tag, never a package to fetch:
+// `pnpm add -D x --filter web`, `npm i -w @org/app x`
+const INSTALL_VALUE_FLAGS = new Set([
+  '--filter', '-F', '-w', '--workspace', '--prefix', '-C', '--dir', '--cwd', '--registry',
+  '--cache', '--userconfig', '--loglevel', '--tag', '--save-prefix', '--workspace-root',
+])
+// Specs resolved inside the repo or on disk: `@acme/sdk@workspace:*`, `x@link:../x`
+const LOCAL_PROTOCOL = /^(?:@[^/@]+\/)?[^@]+@(workspace|link|file|portal):/
+
 function registryNames(tokens: string[]): string[] {
   const names: string[] = []
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i]
+    if (INSTALL_VALUE_FLAGS.has(token)) { i++; continue }
+    if (LOCAL_PROTOCOL.test(token)) continue
     const name = specToPackageName(token)
     if (name) names.push(name)
   }
