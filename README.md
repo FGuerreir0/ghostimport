@@ -73,7 +73,7 @@ The plugin installs these. To set them up by hand instead, install ghostimport g
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "ghostimport hook" }] }
+      { "matcher": "Bash|PowerShell", "hooks": [{ "type": "command", "command": "ghostimport hook" }] }
     ],
     "PostToolUse": [
       { "matcher": "Edit|Write|MultiEdit", "hooks": [{ "type": "command", "command": "ghostimport hook" }] }
@@ -82,7 +82,7 @@ The plugin installs these. To set them up by hand instead, install ghostimport g
 }
 ```
 
-- **`PreToolUse` on Bash** — reads any install command, and any command that downloads and runs a package on the spot (`npx`, `npm exec`, `npm create`, `pnpm dlx`, `yarn dlx`, `bunx`), and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or runs an install script with no track record behind it. Established packages that ship one (`esbuild`, `puppeteer`) go through. This is the one that stops a real attack.
+- **`PreToolUse` on Bash and PowerShell** (PowerShell is Claude Code's shell on Windows) — reads any install command, and any command that downloads and runs a package on the spot (`npx`, `npm exec`, `npm create`, `pnpm dlx`, `yarn dlx`, `bunx`), and **denies the tool call** if it would fetch a package that doesn't exist, is a typosquat, or runs an install script with no track record behind it. Established packages that ship one (`esbuild`, `puppeteer`) go through. This is the one that stops a real attack.
 - **`PostToolUse` on edits** — checks imports the agent just wrote, or dependencies it just added to a `package.json`, and tells it to fix them.
 
 `npx <name>` deserves the attention: it runs the package's code immediately, no postinstall needed, and agents copy npx commands out of READMEs and skill files without checking them. An `npx` of a bin your project already has installed (`npx tsc`) runs the local copy and isn't checked.
@@ -215,7 +215,7 @@ const { missing, undeclared, risks } = await scan('./src')
 | `detectTyposquat(name)` | Returns the popular package it's 1-2 chars from, or `null`. |
 | `extractImports(code)` | Package names from a source string. |
 | `extractInstallTargets(cmd)` | Packages a shell command would install. |
-| `extractCommandTargets(cmd, { cwd? })` | Packages a command would install **or run** (`npx`, `dlx`, `create`), with `action: 'install' | 'exec'`. |
+| `extractCommandTargets(cmd, { cwd?, dialect? })` | Packages a command would install **or run** (`npx`, `dlx`, `create`), with `action: 'install' | 'exec'`. `dialect: 'powershell'` reads PowerShell quoting. |
 
 ```ts
 interface ScanResult {

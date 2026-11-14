@@ -28,6 +28,7 @@ export { extractInstallTargets } from './install'
  */
 export { extractCommandTargets } from './commands'
 export type { CommandTarget, CommandAction, ExtractOptions } from './commands'
+export type { ShellDialect } from './shell'
 
 export type {
   Config,

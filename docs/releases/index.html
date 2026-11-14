@@ -95,12 +95,51 @@
     </p>
   </header>
 
+  <!-- v0.7.1 -->
+  <article class="release" id="v0.7.1">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.1">v0.7.1</a></div>
+      <div class="date">2026-11-14</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <p>
+        On Windows, Claude Code runs commands through its PowerShell tool, and the install hook only
+        watched Bash. Most commands an agent ran there were never checked.
+      </p>
+      <h2>Fixes</h2>
+      <ul>
+        <li>
+          <strong>The hook now checks the PowerShell tool too.</strong> The plugin's
+          <code>PreToolUse</code> matcher is <code>Bash|PowerShell</code>, and the hook vets
+          <code>tool_name: "PowerShell"</code> commands the same way it vets Bash ones.
+        </li>
+        <li>
+          PowerShell commands are read with PowerShell's quoting rules: backslashes are literal and the
+          backtick escapes. Before, <code>&amp; C:\tools\npx.cmd -y some-pkg</code> lost its backslashes
+          and the package went unseen. The same rules now apply inside <code>pwsh -Command '…'</code>.
+        </li>
+      </ul>
+      <h2>Upgrading</h2>
+      <ul>
+        <li>Plugin users: update the plugin (<code>/plugin</code>, then update ghostimport) and start a new session.</li>
+        <li>
+          If you wired the hook into <code>.claude/settings.json</code> by hand, change its
+          <code>PreToolUse</code> matcher from <code>"Bash"</code> to <code>"Bash|PowerShell"</code>.
+        </li>
+        <li>
+          API: <code>extractCommandTargets</code> takes a new optional
+          <code>dialect: 'posix' | 'powershell'</code>. The default is unchanged.
+        </li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.7.0 -->
   <article class="release" id="v0.7.0">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.0">v0.7.0</a></div>
       <div class="date">2026-11-14</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <h2>Install</h2>

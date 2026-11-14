@@ -8,6 +8,7 @@
 import fs from 'fs'
 import path from 'path'
 import { splitCommands, stripPrefixes, inlineShellScript, binName } from './shell'
+import type { ShellDialect } from './shell'
 
 export type CommandAction = 'install' | 'exec'
 
@@ -34,6 +35,8 @@ export interface ExtractOptions {
    * `node_modules/.bin` (here or in a parent) is dropped — it runs the local copy.
    */
   cwd?: string
+  /** Quoting rules for the command line. `powershell` for the PowerShell tool. Default `posix`. */
+  dialect?: ShellDialect
 }
 
 // ─── Package-manager grammar ─────────────────────────────────────────────────
@@ -81,7 +84,7 @@ const MAX_DEPTH = 3
 /** Every registry package the command would install or run, de-duplicated. */
 export function extractCommandTargets(command: string, opts: ExtractOptions = {}): CommandTarget[] {
   const found = new Map<string, CommandTarget>()
-  for (const t of parseLine(command, 0)) {
+  for (const t of parseLine(command, 0, opts.dialect)) {
     if (opts.cwd && t.action === 'exec' && !t.pinned && hasLocalBin(t.bin ?? binOf(t.name), opts.cwd)) continue
     const key = `${t.action}:${t.name}`
     if (!found.has(key)) found.set(key, t)
@@ -89,18 +92,18 @@ export function extractCommandTargets(command: string, opts: ExtractOptions = {}
   return [...found.values()]
 }
 
-function parseLine(command: string, depth: number): CommandTarget[] {
+function parseLine(command: string, depth: number, dialect: ShellDialect = 'posix'): CommandTarget[] {
   if (depth > MAX_DEPTH) return []
   const out: CommandTarget[] = []
-  for (const raw of splitCommands(command)) out.push(...parseTokens(stripPrefixes(raw), depth))
+  for (const raw of splitCommands(command, dialect)) out.push(...parseTokens(stripPrefixes(raw), depth))
   return out
 }
 
 function parseTokens(tokens: string[], depth: number): CommandTarget[] {
   if (tokens.length === 0) return []
 
-  const script = inlineShellScript(tokens)
-  if (script !== null) return parseLine(script, depth + 1)
+  const inline = inlineShellScript(tokens)
+  if (inline !== null) return parseLine(inline.script, depth + 1, inline.dialect)
 
   const bin = binName(tokens[0])
   const args = tokens.slice(1)

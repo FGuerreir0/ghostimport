@@ -5,7 +5,7 @@
 // feed a correction back to the model (PostToolUse).
 //
 // Two guards:
-//   PreToolUse  + Bash  → vet packages a command would install, or download and run
+//   PreToolUse  + Bash/PowerShell → vet packages a command would install, or download and run
 //                         (npx, dlx, create), before it runs
 //   PostToolUse + edits → check imports the agent just wrote into a source file, or
 //                         dependencies it just wrote into a package.json
@@ -33,6 +33,8 @@ const MAX_PACKAGES = 40
 const MAX_MANIFEST_PACKAGES = 200
 const HOOK_SCAN_DEPTH = 4
 
+// Claude Code runs commands through PowerShell on Windows, Bash elsewhere
+const SHELL_TOOLS = new Set(['Bash', 'PowerShell'])
 const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit'])
 
 interface HookPayload {
@@ -77,7 +79,8 @@ async function checkInstallCommand(payload: HookPayload): Promise<{ code: number
   const cwd = payload.cwd ?? process.cwd()
   const isLocal = localNames(cwd)
   // `cwd` lets an unpinned `npx tsc` through when the project already has that bin
-  const targets = extractCommandTargets(command, { cwd })
+  const dialect = payload.tool_name === 'PowerShell' ? 'powershell' : 'posix'
+  const targets = extractCommandTargets(command, { cwd, dialect })
     .filter(t => !isLocal(t.name))
     .slice(0, MAX_PACKAGES)
   if (targets.length === 0) return { code: ALLOW }
@@ -197,7 +200,7 @@ export async function runHook(): Promise<number> {
   }
 
   const guard =
-    payload.tool_name === 'Bash' ? checkInstallCommand
+    SHELL_TOOLS.has(payload.tool_name ?? '') ? checkInstallCommand
     : EDIT_TOOLS.has(payload.tool_name ?? '') ? checkEditedFile
     : null
 

@@ -344,6 +344,15 @@ for (const [command, expected, label] of commandCases) {
   assert(got === expected, `${label}: ${command}${got === expected ? '' : ` → got "${got}"`}`)
 }
 
+// PowerShell: backslashes are literal, the backtick escapes
+const ps = (command: string): string => extractCommandTargets(command, { dialect: 'powershell' })
+  .map(t => `${t.action}:${t.name}`).sort().join(' ')
+assert(ps('& C:\\tools\\npx.cmd -y a-pkg') === 'exec:a-pkg', 'PowerShell: Windows path to npx with & call operator')
+assert(ps('cd C:\\app; npm i zod') === 'install:zod', 'PowerShell: ; separator after a Windows path')
+assert(ps('npm i `\n  zod') === 'install:zod', 'PowerShell: backtick line continuation')
+assert(ps('npm i "`zod" "a\\b"') === 'install:zod','PowerShell: backtick escape inside double quotes')
+assert(cmd(`bash -c "pwsh -Command 'npx C:\\\\x\\\\y.js'"`) === '', 'pwsh -Command script is read as PowerShell')
+
 const repoRoot = path.join(import.meta.dirname, '..')
 assert(cmd('npx tsc', repoRoot) === '', 'an unpinned npx of a locally installed bin is skipped')
 assert(cmd('npx tsc@5', repoRoot) === 'exec:tsc!', 'a pinned npx is checked even when the bin is local')
@@ -644,6 +653,14 @@ if (networkAvailable) {
   })
   assert(npxMissing.code === 2, 'blocks npx of a package that does not exist')
   assert(npxMissing.stderr.includes('download and run'), 'npx block message says the package would run')
+
+  const pwshMissing = await runHookProcess({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'PowerShell',
+    tool_input: { command: 'Set-Location C:\\tmp; npx -y this-package-absolutely-does-not-exist-ghostimport-test-xyz123' },
+    cwd: path.join(import.meta.dirname, '..'),
+  })
+  assert(pwshMissing.code === 2, 'blocks npx of a missing package through the PowerShell tool')
 
   const createMissing = await runHookProcess({
     hook_event_name: 'PreToolUse',

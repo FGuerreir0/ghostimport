@@ -6,12 +6,19 @@
 const OPERATORS = ['&&', '||', ';', '|', '&', '\n']
 
 /**
+ * Which quoting rules to read a command with. PowerShell escapes with a backtick and
+ * keeps backslashes literal (`C:\tools\npm.cmd`); POSIX shells escape with a backslash.
+ */
+export type ShellDialect = 'posix' | 'powershell'
+
+/**
  * Split a command line into simple commands, each a list of tokens.
  *
  * Quotes keep their contents together (and operators inside them inert), so
  * `sh -c 'npm i a && npm i b'` is one command whose last token is the inner script.
  */
-export function splitCommands(command: string): string[][] {
+export function splitCommands(command: string, dialect: ShellDialect = 'posix'): string[][] {
+  const escape = dialect === 'powershell' ? '`' : '\\'
   const commands: string[][] = []
   let tokens: string[] = []
   let current = ''
@@ -44,7 +51,11 @@ export function splitCommands(command: string): string[][] {
     if (ch === '"') {
       i++
       while (i < command.length && command[i] !== '"') {
-        if (command[i] === '\\' && i + 1 < command.length && '"\\$`'.includes(command[i + 1])) i++
+        if (dialect === 'powershell') {
+          if (command[i] === '`' && i + 1 < command.length) i++
+        } else if (command[i] === '\\' && i + 1 < command.length && '"\\$`'.includes(command[i + 1])) {
+          i++
+        }
         current += command[i]
         i++
       }
@@ -53,7 +64,7 @@ export function splitCommands(command: string): string[][] {
       continue
     }
 
-    if (ch === '\\' && i + 1 < command.length) {
+    if (ch === escape && i + 1 < command.length) {
       // A backslash-newline continues the line; any other escaped character is literal
       if (command[i + 1] !== '\n') current += command[i + 1]
       inToken = inToken || command[i + 1] !== '\n'
@@ -129,18 +140,22 @@ export function stripPrefixes(tokens: string[]): string[] {
 
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'ksh', 'fish', 'pwsh', 'powershell', 'cmd'])
 
+const POWERSHELLS = new Set(['pwsh', 'powershell'])
+
 /**
- * The script a shell is asked to run: `bash -c '…'`, `pwsh -Command '…'`, `cmd /c …`.
- * Returns null when the tokens are not a shell invocation with an inline script.
+ * The script a shell is asked to run: `bash -c '…'`, `pwsh -Command '…'`, `cmd /c …`,
+ * and the quoting rules to read it with. Returns null when the tokens are not a shell
+ * invocation with an inline script.
  */
-export function inlineShellScript(tokens: string[]): string | null {
+export function inlineShellScript(tokens: string[]): { script: string; dialect: ShellDialect } | null {
   const bin = binName(tokens[0] ?? '')
   if (!SHELLS.has(bin)) return null
   for (let i = 1; i < tokens.length; i++) {
     const flag = tokens[i].toLowerCase()
     if (flag === '-c' || flag === '-command' || flag === '/c' || flag === '/k' || flag === '-lc') {
       const rest = tokens.slice(i + 1)
-      return rest.length > 0 ? rest.join(' ') : null
+      if (rest.length === 0) return null
+      return { script: rest.join(' '), dialect: POWERSHELLS.has(bin) ? 'powershell' : 'posix' }
     }
   }
   return null
