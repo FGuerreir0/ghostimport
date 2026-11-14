@@ -15,11 +15,14 @@ npm run build    # type-check, emit .d.ts, bundle
 | `src/verify.ts` | `verifyPackages()` — shared by the CLI, MCP server and hook |
 | `src/npm.ts` | Registry checks, risk heuristics, typosquat detection |
 | `src/imports.ts` · `src/sfc.ts` | Import extraction |
-| `src/install.ts` | Parses install commands into package names |
+| `src/commands.ts` · `src/shell.ts` | Reads shell commands: installs, and `npx`/`dlx`/`create` runs (`src/install.ts` is the old API's wrapper) |
 | `src/mcp.ts` | MCP server (hand-rolled JSON-RPC — no SDK dependency) |
 | `src/hook.ts` | Agent hook |
 | `src/cli.ts` | CLI and subcommand dispatch |
 | `src/files.ts` · `src/config.ts` · `src/cache.ts` | Walking, config, 24h registry cache |
+| `.claude-plugin/` · `hooks/hooks.json` | The Claude Code plugin and its self-hosted marketplace. Shipped in the npm package |
+| `server.json` | The MCP Registry listing, published by `publish.yml` |
+| `scripts/sync-version.mjs` | npm `version` script: copies the version into `plugin.json` and `server.json` |
 | `docs/` | The landing page — one static `index.html`, no build step |
 
 ## The website

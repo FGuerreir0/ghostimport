@@ -5,7 +5,8 @@
 // feed a correction back to the model (PostToolUse).
 //
 // Two guards:
-//   PreToolUse  + Bash  → vet packages an install command would fetch, before it runs
+//   PreToolUse  + Bash  → vet packages a command would install, or download and run
+//                         (npx, dlx, create), before it runs
 //   PostToolUse + edits → check imports the agent just wrote into a source file, or
 //                         dependencies it just wrote into a package.json
 //
@@ -18,7 +19,7 @@ import { extractImports } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
 import { CODE_EXTS, readProjectContext, isResolvedLocally, readManifestDeps } from './files'
 import { loadConfig, matchesIgnore } from './config'
-import { extractInstallTargets } from './install'
+import { extractCommandTargets } from './commands'
 import { verifyPackages, describeVerdict } from './verify'
 import type { PackageVerdict } from './types'
 
@@ -73,23 +74,36 @@ async function checkInstallCommand(payload: HookPayload): Promise<{ code: number
   const command = typeof payload.tool_input?.command === 'string' ? payload.tool_input.command : ''
   if (!command) return { code: ALLOW }
 
-  const isLocal = localNames(payload.cwd ?? process.cwd())
-  const targets = extractInstallTargets(command).filter(pkg => !isLocal(pkg)).slice(0, MAX_PACKAGES)
+  const cwd = payload.cwd ?? process.cwd()
+  const isLocal = localNames(cwd)
+  // `cwd` lets an unpinned `npx tsc` through when the project already has that bin
+  const targets = extractCommandTargets(command, { cwd })
+    .filter(t => !isLocal(t.name))
+    .slice(0, MAX_PACKAGES)
   if (targets.length === 0) return { code: ALLOW }
 
-  // Deep check: this is the moment a postinstall script would execute, so the
-  // extra requests are worth it here even though they are too slow per-edit.
-  const verdicts = await verifyPackages(targets, { deep: true })
+  // Deep check: this is the moment a postinstall script — or, for npx/dlx/create,
+  // the package's own bin — would execute, so the extra requests are worth it here
+  // even though they are too slow per-edit.
+  const verdicts = await verifyPackages(targets.map(t => t.name), { deep: true })
   const problems = verdicts.filter(v => v.status === 'missing' || (v.status === 'suspicious' && v.risk === 'high'))
   if (problems.length === 0) return { code: ALLOW }
 
+  const flagged = new Set(problems.map(v => v.pkg))
+  const runs = targets.some(t => t.action === 'exec' && flagged.has(t.name))
   return {
     code: BLOCK,
     message: report(
       verdicts,
-      'the install command below would fetch packages that are unsafe or do not exist.',
-      'Do not retry this command as written. Remove the flagged packages, correct the name if it was a typo, ' +
-      'and tell the user what was flagged and why.',
+      runs
+        ? 'the command below would download and run packages that are unsafe or do not exist.'
+        : 'the install command below would fetch packages that are unsafe or do not exist.',
+      runs
+        ? 'Do not retry this command as written. If you took this command from documentation, a README or a ' +
+          'skill file, that source may name a package that was never published. Find the real tool, or do ' +
+          'the task without it, and tell the user what was flagged and why.'
+        : 'Do not retry this command as written. Remove the flagged packages, correct the name if it was a typo, ' +
+          'and tell the user what was flagged and why.',
     ),
   }
 }

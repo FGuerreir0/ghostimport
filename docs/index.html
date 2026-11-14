@@ -18,12 +18,14 @@
 <meta property="og:site_name" content="ghostimport">
 <meta property="og:title" content="ghostimport — Stop AI Installing npm Packages That Don't Exist">
 <meta property="og:description" content="Your AI invents an npm package name; an attacker registers it. ghostimport blocks the install first.">
-<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
-<meta property="og:image:alt" content="The ghostimport logo: a ghost drawn with a dashed outline">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ghostimport: Your AI invents a package name. Someone registers it. A dashed card shows an unregistered name, a solid card a real package.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ghostimport — Stop AI Installing npm Packages That Don't Exist">
 <meta name="twitter:description" content="Your AI invents an npm package name; an attacker registers it. ghostimport blocks the install first.">
-<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
 
 <!-- Structured data. No aggregateRating — inventing review counts is a manual-action risk. -->
 <script type="application/ld+json">
@@ -84,7 +86,7 @@
           "name": "How do I stop my AI agent from installing a package that does not exist?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Run ghostimport as an agent hook. A PreToolUse hook on Bash inspects any npm, pnpm, yarn or bun install command and denies the tool call when a package does not exist, is a typosquat, or runs an install script with no track record behind it. Unlike an MCP tool, a hook runs whether or not the model chooses to call it."
+            "text": "Run ghostimport as an agent hook. A PreToolUse hook on Bash inspects any npm, pnpm, yarn or bun install command, and any npx, dlx or create command, and denies the tool call when a package does not exist, is a typosquat, or runs an install script with no track record behind it. Unlike an MCP tool, a hook runs whether or not the model chooses to call it."
           }
         }
       ]
@@ -226,8 +228,10 @@ section:first-of-type { border-top: 0; }
   font-family: var(--mono); font-size: 15px;
   background: var(--surface); border: 1px solid var(--line);
   border-radius: 10px; padding: 15px 22px; margin-bottom: 22px;
+  max-width: 100%; text-align: left;
 }
 .install .dollar { color: var(--faint); }
+.install span:last-child { overflow-wrap: anywhere; }
 .zero-dep {
   display: inline-flex; align-items: center; gap: 9px;
   font-family: var(--mono); font-size: 12px; color: var(--safe);
@@ -434,21 +438,13 @@ section:first-of-type { border-top: 0; }
         <div class="card-role">Enforcing</div>
         <h3>Agent hooks</h3>
         <p>
-          Runs on every matching tool call, whether or not the model cooperates. On an install command
-          it <strong style="color:var(--bone)">denies the call outright</strong>.
+          Runs on every matching tool call, whether or not the model cooperates. On an install or
+          <code>npx</code> command it <strong style="color:var(--bone)">denies the call outright</strong>.
         </p>
-<pre><span class="c">// .claude/settings.json</span>
-{
-  <span class="k">"hooks"</span>: {
-    <span class="k">"PreToolUse"</span>: [{
-      <span class="k">"matcher"</span>: <span class="s">"Bash"</span>,
-      <span class="k">"hooks"</span>: [{ <span class="k">"type"</span>: <span class="s">"command"</span>,
-        <span class="k">"command"</span>: <span class="s">"ghostimport hook"</span> }]
-    }]
-  }
-}</pre>
+<pre><span class="c"># Claude Code: hooks + MCP server in one plugin</span>
+/plugin install ghostimport   --marketplace FGuerreir0/ghostimport</pre>
         <ul>
-          <li><strong>PreToolUse on Bash</strong> — vets install commands before they run</li>
+          <li><strong>PreToolUse on Bash</strong> — vets installs and <code>npx</code> / <code>dlx</code> / <code>create</code> runs before they happen</li>
           <li><strong>PostToolUse on edits</strong> — checks imports just written</li>
           <li><strong>Fails open</strong> — offline or slow, it exits clean and stays out of your way</li>
         </ul>
@@ -465,7 +461,7 @@ claude mcp add ghostimport \
   -- npx -y ghostimport mcp</pre>
         <ul>
           <li><strong>check_packages</strong> — do these names exist?</li>
-          <li><strong>check_install_command</strong> — vet a full install line</li>
+          <li><strong>check_install_command</strong> — vet an install or npx line</li>
           <li><strong>scan_project</strong> — audit a whole directory</li>
         </ul>
         <p style="font-size:14px;color:var(--faint);margin-top:auto">
@@ -609,7 +605,7 @@ claude mcp add ghostimport \
         <h3>How do I stop my AI agent from installing a package that doesn't exist?</h3>
         <p>
           Run ghostimport as an <a href="docs/#hooks">agent hook</a>. A <code>PreToolUse</code> hook
-          on Bash inspects any install command and denies the tool call when a package doesn't
+          on Bash inspects any install or <code>npx</code> command and denies the tool call when a package doesn't
           exist, is a typosquat, or runs an install script with no track record behind it. Unlike an MCP tool, a hook runs whether
           or not the model chooses to call it.
         </p>
@@ -620,12 +616,13 @@ claude mcp add ghostimport \
   <!-- ── Close ─────────────────────────────────────────────────────────── -->
   <section class="close">
     <h2>Check the name before you trust it</h2>
-    <p>One command. Node 22+. Nothing to configure before it's useful.</p>
+    <p>One command in Claude Code. Node 22+. Nothing to configure before it's useful.</p>
 
     <div class="install">
-      <span class="dollar">$</span>
-      <span>npm install -g ghostimport</span>
+      <span class="dollar">›</span>
+      <span>/plugin install ghostimport --marketplace FGuerreir0/ghostimport</span>
     </div>
+    <p style="font-size:15px;color:var(--faint)">CLI and other agents: <code>npm install -g ghostimport</code></p>
 
     <div>
       <span class="zero-dep">◆ zero runtime dependencies</span>

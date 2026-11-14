@@ -1,0 +1,31 @@
+{
+  "name": "ghostimport",
+  "displayName": "ghostimport",
+  "version": "0.7.0",
+  "description": "Stops Claude installing or running npm packages that don't exist, typosquats, and brand-new packages with install scripts. Blocking hooks plus an MCP server. Zero dependencies, no account.",
+  "author": {
+    "name": "Fábio Guerreiro",
+    "url": "https://github.com/FGuerreir0"
+  },
+  "homepage": "https://fguerreir0.github.io/ghostimport/",
+  "repository": "https://github.com/FGuerreir0/ghostimport",
+  "license": "MIT",
+  "keywords": [
+    "security",
+    "supply-chain",
+    "slopsquatting",
+    "typosquatting",
+    "npm",
+    "hooks",
+    "mcp"
+  ],
+  "mcpServers": {
+    "ghostimport": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/dist/cli.js",
+        "mcp"
+      ]
+    }
+  }
+}

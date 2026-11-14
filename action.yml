@@ -1,5 +1,5 @@
 name: 'ghostimport'
-description: 'Find npm imports that do not exist — hallucinated by AI coding tools and free for attackers to register'
+description: 'Fail CI on npm imports and dependencies that do not exist — free for attackers to register — or look like typosquats'
 author: 'Fábio Guerreiro'
 
 branding:
@@ -19,12 +19,16 @@ inputs:
 outputs:
   missing:
     description: 'Number of imported packages that do not exist on npm'
+    value: ${{ steps.scan.outputs.missing }}
   risks:
     description: 'Number of supply-chain findings'
+    value: ${{ steps.scan.outputs.risks }}
   packages:
     description: 'Total unique packages checked'
+    value: ${{ steps.scan.outputs.packages }}
   result:
     description: 'Full JSON result'
+    value: ${{ steps.scan.outputs.result }}
 
 runs:
   using: 'composite'
@@ -32,36 +36,68 @@ runs:
     - name: Run ghostimport
       id: scan
       shell: bash
+      env:
+        SCAN_PATH: ${{ inputs.path }}
+        FAIL_ON_PROBLEMS: ${{ inputs.fail-on-problems }}
       run: |
+        # Run the ghostimport release this action is pinned to, not whatever is newest —
+        # `uses: FGuerreir0/ghostimport@v0.7.0` should mean the same scanner every time.
+        VERSION=$(jq -r .version "$GITHUB_ACTION_PATH/package.json" 2>/dev/null || echo "")
+        if [ -n "$VERSION" ] && npm view "ghostimport@$VERSION" version >/dev/null 2>&1; then
+          SPEC="ghostimport@$VERSION"
+        else
+          echo "::warning::ghostimport@${VERSION:-?} is not on npm (action pinned to a branch?); using ghostimport@latest"
+          SPEC="ghostimport@latest"
+        fi
+
         set +e
-        RESULT=$(npx ghostimport@latest "${{ inputs.path }}" --quiet --json 2>/dev/null)
+        RESULT=$(npx -y "$SPEC" "$SCAN_PATH" --quiet --json 2>/dev/null)
         set -e
+
+        if ! echo "$RESULT" | jq -e . >/dev/null 2>&1; then
+          echo "::warning::ghostimport produced no result (registry unreachable?); skipping"
+          echo "### ⚠️ ghostimport could not complete the scan" >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
 
         MISSING=$(echo "$RESULT" | jq -r '.missing | length')
         RISKS=$(echo "$RESULT" | jq -r '.risks | length')
         PACKAGES=$(echo "$RESULT" | jq -r '.packages')
 
-        echo "missing=$MISSING" >> $GITHUB_OUTPUT
-        echo "risks=$RISKS" >> $GITHUB_OUTPUT
-        echo "packages=$PACKAGES" >> $GITHUB_OUTPUT
+        echo "missing=$MISSING" >> "$GITHUB_OUTPUT"
+        echo "risks=$RISKS" >> "$GITHUB_OUTPUT"
+        echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
 
-        # Write multiline JSON to output
+        # Multiline JSON output
         EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-        echo "result<<$EOF" >> $GITHUB_OUTPUT
-        echo "$RESULT" >> $GITHUB_OUTPUT
-        echo "$EOF" >> $GITHUB_OUTPUT
+        {
+          echo "result<<$EOF"
+          echo "$RESULT"
+          echo "$EOF"
+        } >> "$GITHUB_OUTPUT"
 
-        # Summary
-        if [ "$MISSING" -gt 0 ]; then
-          echo "### 👻 ghostimport found $MISSING package(s) that do not exist on npm" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo '```json' >> $GITHUB_STEP_SUMMARY
-          echo "$RESULT" | jq '.missing' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-          if [ "${{ inputs.fail-on-problems }}" = "true" ]; then
-            exit 1
+        {
+          if [ "$MISSING" -gt 0 ]; then
+            echo "### 👻 ghostimport: $MISSING package(s) do not exist on npm"
+            echo ""
+            echo "| Package | Squattable | Files |"
+            echo "|---|---|---|"
+            echo "$RESULT" | jq -r '.missing[] | "| `\(.pkg)` | \(if .claimable == false then "no (scope owned)" elif .claimable == true then "**yes**" else "unknown" end) | \(.files | join(", ")) |"'
+            echo ""
           fi
-        else
-          echo "### ✅ ghostimport — all $PACKAGES packages exist on npm" >> $GITHUB_STEP_SUMMARY
+          if [ "$RISKS" -gt 0 ]; then
+            echo "### Supply-chain findings"
+            echo ""
+            echo "| Package | Finding |"
+            echo "|---|---|"
+            echo "$RESULT" | jq -r '.risks[] | "| `\(.pkg)` | \(if .type == "unregistered" then "unregistered — anyone could publish it" else "\(.risk) risk: \(.flags | join("; "))" end) |"'
+            echo ""
+          fi
+          if [ "$MISSING" -eq 0 ] && [ "$RISKS" -eq 0 ]; then
+            echo "### ✅ ghostimport: all $PACKAGES packages exist on npm"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if [ "$MISSING" -gt 0 ] && [ "$FAIL_ON_PROBLEMS" = "true" ]; then
+          exit 1
         fi

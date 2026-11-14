@@ -1,6 +1,6 @@
 import {
   extractImports, checkNpm, checkPackageRisk, detectTyposquat,
-  verifyPackages, extractInstallTargets, scan,
+  verifyPackages, extractInstallTargets, extractCommandTargets, scan,
 } from '../src/index'
 // Internals — deliberately not part of the public API
 import { extractSfcScripts } from '../src/sfc'
@@ -8,6 +8,7 @@ import { loadConfig } from '../src/config'
 import { loadCache, saveCache } from '../src/cache'
 import { hasBlockingVerdict, describeVerdict } from '../src/verify'
 import { specToPackageName } from '../src/install'
+import { createPackageName } from '../src/commands'
 import { readProjectContext, isResolvedLocally, registryDeps } from '../src/files'
 import { checkScope, scoreRisk, type RiskSignals } from '../src/npm'
 import fs from 'fs'
@@ -291,6 +292,64 @@ assert(targets('npm i ../sibling').length === 0, 'ignores parent paths')
 assert(specToPackageName('axios@~1.2.3') === 'axios', 'specToPackageName strips range')
 assert(specToPackageName('@a/b') === '@a/b', 'specToPackageName keeps scoped name')
 assert(specToPackageName('-D') === null, 'specToPackageName rejects flags')
+assert(targets('npm i axios > log.txt 2>&1').join() === 'axios', 'ignores redirection targets')
+assert(targets('bash -c "npm i lodash"').join() === 'lodash', 'reads an install inside bash -c')
+assert(targets('npx -y npm i left-pad').join() === 'left-pad', 'reads an install run through npx npm')
+assert(targets('npx create-vite').length === 0, 'npx is not an install (see extractCommandTargets)')
+
+// ─── extractCommandTargets ───────────────────────────────────────────────────
+
+console.log('\nextractCommandTargets()')
+
+function cmd(command: string, cwd?: string): string {
+  return extractCommandTargets(command, { cwd })
+    .map(t => `${t.action}:${t.name}${t.action === 'exec' && t.pinned ? '!' : ''}`)
+    .sort()
+    .join(' ')
+}
+
+const commandCases: Array<[string, string, string]> = [
+  ['npx react-codeshift --transform x', 'exec:react-codeshift', 'npx runs a package'],
+  ['npx -y create-vite@latest app', 'exec:create-vite!', 'npx with a version is pinned'],
+  ['npx -p typescript tsc --init', 'exec:typescript!', 'npx -p: the package, not the bin'],
+  ['npx --package=typescript tsc', 'exec:typescript!', 'npx --package='],
+  ['npm exec -- prettier --write .', 'exec:prettier', 'npm exec --'],
+  ['npm x cowsay', 'exec:cowsay', 'npm x'],
+  ['npx -y npm i left-pad', 'exec:npm install:left-pad', 'npx of a package manager is followed'],
+  [`npx -c 'npm i x && y'`, 'install:x', 'npx -c script is parsed'],
+  ['FOO=1 npx a-pkg', 'exec:a-pkg', 'env assignment prefix'],
+  ['npx.cmd a-pkg', 'exec:a-pkg', 'Windows .cmd shim'],
+  ['npm create vite@latest', 'exec:create-vite!', 'npm create foo → create-foo'],
+  ['npm init @usr/foo', 'exec:@usr/create-foo!', 'npm init @usr/foo → @usr/create-foo'],
+  ['npm init @usr', 'exec:@usr/create!', 'npm init @usr → @usr/create'],
+  ['npm init -y', '', 'npm init with no initializer runs nothing'],
+  ['pnpm dlx shadcn@latest init', 'exec:shadcn!', 'pnpm dlx'],
+  ['pnpx cowsay hi', 'exec:cowsay!', 'pnpx'],
+  ['pnpm create next-app', 'exec:create-next-app!', 'pnpm create'],
+  ['pnpm create create-foo', 'exec:create-foo!', 'pnpm keeps a create- prefix'],
+  ['yarn dlx -p foo bar', 'exec:foo!', 'yarn dlx -p'],
+  ['yarn create react-app x', 'exec:create-react-app!', 'yarn create'],
+  ['bunx cowsay', 'exec:cowsay', 'bunx'],
+  ['bun x cowsay', 'exec:cowsay', 'bun x'],
+  ['bun create vite', 'exec:create-vite!', 'bun create'],
+  ['bun create user/repo', '', 'bun create from a GitHub template'],
+  ['pnpm exec tsc', '', 'pnpm exec runs local bins only'],
+  ['echo npx a', '', 'npx mentioned as an argument'],
+  ['npx ./x.js', '', 'npx of a local file'],
+  [`pwsh -Command "npm i zod"`, 'install:zod', 'pwsh -Command script'],
+  ['sudo -E npm i -g pm2', 'install:pm2', 'sudo with flags'],
+]
+for (const [command, expected, label] of commandCases) {
+  const got = cmd(command)
+  assert(got === expected, `${label}: ${command}${got === expected ? '' : ` → got "${got}"`}`)
+}
+
+const repoRoot = path.join(import.meta.dirname, '..')
+assert(cmd('npx tsc', repoRoot) === '', 'an unpinned npx of a locally installed bin is skipped')
+assert(cmd('npx tsc@5', repoRoot) === 'exec:tsc!', 'a pinned npx is checked even when the bin is local')
+assert(cmd('npx tsc', os.tmpdir()) === 'exec:tsc', 'npx of a bin that is not installed is checked')
+assert(createPackageName('./template') === null, 'createPackageName: a path is not a registry package')
+assert(createPackageName('foo@2') === 'create-foo', 'createPackageName strips the version')
 
 // ─── verifyPackages ──────────────────────────────────────────────────────────
 
@@ -577,6 +636,31 @@ if (networkAvailable) {
   assert(popular.code === 0, 'allows popular packages that ship install scripts or sit near a popular name')
   if (popular.code !== 0) console.error(popular.stderr)
 
+  const npxMissing = await runHookProcess({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'npx -y this-package-absolutely-does-not-exist-ghostimport-test-xyz123 --init' },
+    cwd: path.join(import.meta.dirname, '..'),
+  })
+  assert(npxMissing.code === 2, 'blocks npx of a package that does not exist')
+  assert(npxMissing.stderr.includes('download and run'), 'npx block message says the package would run')
+
+  const createMissing = await runHookProcess({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'npm create this-package-absolutely-does-not-exist-ghostimport-test-xyz123' },
+    cwd: path.join(import.meta.dirname, '..'),
+  })
+  assert(createMissing.code === 2, 'blocks npm create of an initializer that does not exist')
+
+  const npxLocal = await runHookProcess({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Bash',
+    tool_input: { command: 'npx tsc --noEmit' },
+    cwd: path.join(import.meta.dirname, '..'),
+  })
+  assert(npxLocal.code === 0, 'allows npx of a bin the project already has')
+
   const hookTmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostimport-hook-'))
   const badFile = path.join(hookTmp, 'bad.ts')
   fs.writeFileSync(badFile, `import x from 'this-package-absolutely-does-not-exist-ghostimport-test-xyz123'\n`)
@@ -612,6 +696,45 @@ if (networkAvailable) {
   fs.rmSync(hookTmp, { recursive: true })
 } else {
   console.log('  ℹ network unavailable — skipping live hook tests')
+}
+
+// ─── Distribution manifests ─────────────────────────────────────────────────
+// The Claude Code plugin and the MCP Registry read these files; a mismatch with
+// package.json fails the install or the registry publish, not the build.
+
+console.log('\nDistribution manifests')
+
+{
+  const readJson = (file: string): Record<string, any> =>
+    JSON.parse(fs.readFileSync(path.join(repoRoot, file), 'utf8'))
+  const pkg = readJson('package.json')
+  const plugin = readJson('.claude-plugin/plugin.json')
+  const marketplace = readJson('.claude-plugin/marketplace.json')
+  const server = readJson('server.json')
+  const hooks = readJson('hooks/hooks.json')
+
+  assert(plugin.version === pkg.version, `plugin.json version matches package.json (${plugin.version} / ${pkg.version})`)
+  assert(server.version === pkg.version, 'server.json version matches package.json')
+  assert(server.packages?.[0]?.version === pkg.version, 'server.json package version matches package.json')
+  assert(server.name === pkg.mcpName, 'server.json name matches package.json mcpName')
+  assert(typeof server.description === 'string' && server.description.length <= 100,
+    `server.json description fits the registry's 100-character limit (${server.description?.length})`)
+  assert(server.packages?.[0]?.packageArguments?.some((a: any) => a.value === 'mcp'),
+    'server.json launches the MCP server (positional argument "mcp"), not the scanner')
+
+  assert(plugin.name === 'ghostimport' && marketplace.plugins?.[0]?.name === plugin.name,
+    'marketplace entry name matches the plugin manifest name')
+  assert(marketplace.plugins?.[0]?.source?.source === 'npm' && marketplace.plugins[0].source.package === pkg.name,
+    'marketplace installs the plugin from the npm package')
+  assert(pkg.files.includes('.claude-plugin/plugin.json') && pkg.files.includes('hooks'),
+    'the npm package ships the plugin manifest and hooks')
+
+  const hookCommands = Object.values(hooks.hooks ?? {}).flat()
+    .flatMap((group: any) => group.hooks ?? []).map((h: any) => h.command as string)
+  assert(hookCommands.length === 2 && hookCommands.every(c => c.includes('${CLAUDE_PLUGIN_ROOT}/dist/cli.js') && c.endsWith(' hook')),
+    'plugin hooks run the bundled CLI from the plugin root')
+  assert(plugin.mcpServers?.ghostimport?.args?.join(' ') === '${CLAUDE_PLUGIN_ROOT}/dist/cli.js mcp',
+    'plugin MCP server runs the bundled CLI from the plugin root')
 }
 
 // ─── Summary ──────────────────────────────────────────────────────────────────

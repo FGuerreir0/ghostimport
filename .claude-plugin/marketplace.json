@@ -1,0 +1,28 @@
+{
+  "name": "ghostimport",
+  "description": "ghostimport: slopsquatting protection for Claude Code.",
+  "owner": {
+    "name": "Fábio Guerreiro",
+    "url": "https://github.com/FGuerreir0"
+  },
+  "plugins": [
+    {
+      "name": "ghostimport",
+      "displayName": "ghostimport",
+      "source": {
+        "source": "npm",
+        "package": "ghostimport"
+      },
+      "description": "Stops Claude installing or running npm packages that don't exist, typosquats, and brand-new packages with install scripts. Blocking hooks plus an MCP server. Zero dependencies, no account.",
+      "author": {
+        "name": "Fábio Guerreiro",
+        "url": "https://github.com/FGuerreir0"
+      },
+      "homepage": "https://fguerreir0.github.io/ghostimport/",
+      "repository": "https://github.com/FGuerreir0/ghostimport",
+      "license": "MIT",
+      "category": "security",
+      "tags": ["security", "supply-chain", "slopsquatting", "typosquatting", "npm", "hooks", "mcp"]
+    }
+  ]
+}

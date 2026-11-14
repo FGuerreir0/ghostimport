@@ -15,11 +15,14 @@
 <meta property="og:url" content="https://fguerreir0.github.io/ghostimport/docs/">
 <meta property="og:title" content="ghostimport Docs — CLI, Agent Hooks &amp; MCP Server Setup">
 <meta property="og:description" content="Install, agent hooks, MCP server, CLI reference, config and API.">
-<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ghostimport: Your AI invents a package name. Someone registers it. A dashed card shows an unregistered name, a solid card a real package.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ghostimport Docs — CLI, Agent Hooks &amp; MCP Server Setup">
 <meta name="twitter:description" content="Install, agent hooks, MCP server, CLI reference, config and API.">
-<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
 
 <script type="application/ld+json">
 {
@@ -95,7 +98,8 @@
   font-family: var(--mono); font-size: 15px;
 }
 .runline .dollar { color: var(--faint); }
-.runline code { background: none; border: 0; padding: 0; color: var(--bone); font-size: 15px; }
+.runline code { background: none; border: 0; padding: 0; color: var(--bone); font-size: 15px; overflow-wrap: anywhere; }
+.runline { max-width: 100%; }
 
 .copy {
   font-family: var(--mono); font-size: 11px; font-weight: 700;
@@ -243,9 +247,9 @@ section.doc li strong, section.doc p strong { color: var(--bone); font-weight: 6
     </p>
 
     <div class="runline">
-      <span class="dollar">$</span>
-      <code>npm install -g ghostimport</code>
-      <button class="copy" type="button" data-copy="npm install -g ghostimport">Copy</button>
+      <span class="dollar">›</span>
+      <code>/plugin install ghostimport --marketplace FGuerreir0/ghostimport</code>
+      <button class="copy" type="button" data-copy="/plugin install ghostimport --marketplace FGuerreir0/ghostimport">Copy</button>
     </div>
 
     <div class="jump-cards">
@@ -299,9 +303,25 @@ section.doc li strong, section.doc p strong { color: var(--bone); font-weight: 6
     <section class="doc" id="install">
       <h2>Install</h2>
       <p>Requires Node.js 22 or newer. Zero runtime dependencies — the published package uses only Node built-ins.</p>
+      <h3>Claude Code plugin</h3>
+      <p>
+        One command installs the <a href="#hooks">blocking hooks</a> and the <a href="#mcp">MCP server</a>
+        together. The plugin runs the CLI bundled in the npm package, so there's no global install and no
+        <code>npx</code> startup on every edit.
+      </p>
+      <div class="term">
+        <div class="term-bar"><i></i><i></i><i></i><span>claude code</span></div>
+<pre>/plugin install ghostimport --marketplace FGuerreir0/ghostimport</pre>
+      </div>
+      <p>
+        On Claude Code older than 2.1.275, add the marketplace first:
+        <code>/plugin marketplace add FGuerreir0/ghostimport</code>, then
+        <code>/plugin install ghostimport@ghostimport</code>.
+      </p>
+      <h3>CLI, CI, or another agent</h3>
       <div class="term">
         <div class="term-bar"><i></i><i></i><i></i><span>install</span></div>
-<pre><span class="d">#</span> <span class="c">global — recommended if you'll use the hook</span>
+<pre><span class="d">#</span> <span class="c">global — needed for a hand-wired hook</span>
 npm install -g ghostimport
 
 <span class="d">#</span> <span class="c">one-off, no install</span>
@@ -312,7 +332,7 @@ npm install --save-dev ghostimport</pre>
       </div>
       <div class="note">
         <p>
-          If you're wiring up the <a href="#hooks">hook</a>, install <strong>globally</strong>. Hooks run on
+          If you're wiring up the <a href="#hooks">hook</a> by hand, install <strong>globally</strong>. Hooks run on
           every matching tool call, and <code>npx</code> pays a startup cost each time.
         </p>
       </div>
@@ -355,7 +375,10 @@ npm install --save-dev ghostimport</pre>
         The enforcing integration. Hooks run on every matching tool call whether or not the model
         cooperates — unlike MCP tools, which the model has to choose to call.
       </p>
-      <p>Add to <code>.claude/settings.json</code>:</p>
+      <p>
+        The <a href="#install">Claude Code plugin</a> installs these for you. To wire them up by hand,
+        install ghostimport globally and add to <code>.claude/settings.json</code>:
+      </p>
       <div class="term">
         <div class="term-bar"><i></i><i></i><i></i><span>.claude/settings.json</span></div>
 <pre>{
@@ -380,10 +403,14 @@ npm install --save-dev ghostimport</pre>
       <ul>
         <li>
           <strong>PreToolUse on Bash</strong> — parses any <code>npm</code>, <code>pnpm</code>,
-          <code>yarn</code> or <code>bun</code> install command and <strong>denies the tool call</strong>
+          <code>yarn</code> or <code>bun</code> install command, and any command that downloads and runs a
+          package on the spot — <code>npx</code>, <code>npm exec</code>, <code>npm create</code> /
+          <code>npm init &lt;x&gt;</code>, <code>pnpm dlx</code>, <code>yarn dlx</code>, <code>bunx</code> —
+          and <strong>denies the tool call</strong>
           if it would fetch a package that doesn't exist, is a typosquat, or runs an install script
           with no track record behind it — established packages that ship one, like
           <code>esbuild</code>, go through. This is the one that stops a real attack, because it fires before the postinstall could run.
+          An unpinned <code>npx</code> of a bin the project already has (<code>npx tsc</code>) runs the local copy and isn't checked.
         </li>
         <li>
           <strong>PostToolUse on edits</strong> — reads the file the agent just wrote, extracts its

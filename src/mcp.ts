@@ -9,7 +9,7 @@ import path from 'path'
 import { scan } from './scan'
 import { loadConfig } from './config'
 import { verifyPackages, describeVerdict } from './verify'
-import { extractInstallTargets } from './install'
+import { extractCommandTargets } from './commands'
 import type { PackageVerdict } from './types'
 
 const KNOWN_PROTOCOL_VERSIONS = ['2024-11-05', '2025-03-26', '2025-06-18', '2025-11-25']
@@ -102,28 +102,35 @@ function buildTools(): ToolDefinition[] {
     {
       name: 'check_install_command',
       description:
-        'Vet a package-manager install command (npm/pnpm/yarn/bun) before running it. ' +
-        'Extracts every package the command would install and checks each one for non-existence, ' +
-        'typosquatting, and install-time scripts that execute arbitrary code. ' +
-        'Call this before running any command that adds a dependency.',
+        'Vet a package-manager command before running it: installs (npm/pnpm/yarn/bun add or install) and ' +
+        'commands that download and run a package on the spot (npx, npm exec, npm create / npm init <x>, ' +
+        'pnpm dlx, yarn dlx, bunx). Checks every package involved for non-existence, typosquatting, and ' +
+        'install-time scripts on packages with no track record. Call this before running any such command, ' +
+        'especially one copied from documentation, a README or a skill file.',
       inputSchema: {
         type: 'object',
         properties: {
           command: {
             type: 'string',
-            description: "The full shell command, e.g. 'npm install axios zod'.",
+            description: "The full shell command, e.g. 'npm install axios zod' or 'npx create-vite@latest app'.",
+          },
+          cwd: {
+            type: 'string',
+            description: 'Project directory. When given, an unpinned npx of a bin the project already has installed is skipped.',
           },
         },
         required: ['command'],
       },
       handler: async (args) => {
         const command = typeof args.command === 'string' ? args.command : ''
-        const targets = extractInstallTargets(command)
+        const cwd = typeof args.cwd === 'string' ? path.resolve(args.cwd) : undefined
+        const targets = extractCommandTargets(command, { cwd })
         if (targets.length === 0) {
-          return 'This command does not install any new packages from the npm registry. Safe to run.'
+          return 'This command does not install or run any package from the npm registry. Safe to run.'
         }
-        const verdicts = await verifyPackages(targets, { deep: true })
-        return formatVerdicts(verdicts, 'packages to be installed')
+        const verdicts = await verifyPackages(targets.map(t => t.name), { deep: true })
+        const runs = targets.some(t => t.action === 'exec')
+        return formatVerdicts(verdicts, runs ? 'packages this command fetches' : 'packages to be installed')
       },
     },
 

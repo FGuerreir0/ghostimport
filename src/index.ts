@@ -22,6 +22,13 @@ export { extractImports } from './imports'
 /** Pull the packages a shell command would install. */
 export { extractInstallTargets } from './install'
 
+/**
+ * Every package a shell command would install, or download and run on the spot
+ * (`npx`, `npm exec`, `npm create`, `pnpm dlx`, `yarn dlx`, `bunx`).
+ */
+export { extractCommandTargets } from './commands'
+export type { CommandTarget, CommandAction, ExtractOptions } from './commands'
+
 export type {
   Config,
   ScanOptions,

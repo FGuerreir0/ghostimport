@@ -1,6 +1,6 @@
 - id: ghostimport
   name: ghostimport
-  description: Detect hallucinated npm imports
+  description: Fail on npm imports and dependencies that do not exist (slopsquatting) or look like typosquats
   entry: npx ghostimport --quiet
   language: node
   always_run: true

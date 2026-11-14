@@ -1,0 +1,28 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.FGuerreir0/ghostimport",
+  "title": "ghostimport",
+  "description": "Stops AI agents installing npm packages that don't exist, typosquats, or risky install scripts.",
+  "repository": {
+    "url": "https://github.com/FGuerreir0/ghostimport",
+    "source": "github"
+  },
+  "websiteUrl": "https://fguerreir0.github.io/ghostimport/",
+  "version": "0.7.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "ghostimport",
+      "version": "0.7.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 {
   "name": "ghostimport",
-  "version": "0.6.1",
-  "description": "Stops AI coding agents from installing npm packages that don't exist. MCP server + hooks that block slopsquatting and typosquat supply-chain attacks.",
+  "mcpName": "io.github.FGuerreir0/ghostimport",
+  "version": "0.7.0",
+  "description": "Stops AI coding agents from installing or running npm packages that don't exist. Claude Code plugin, MCP server and hooks that block slopsquatting and typosquat supply-chain attacks, including npx and create commands.",
   "keywords": [
     "npm",
     "ai",
@@ -25,7 +26,9 @@
     "supply-chain-security",
     "hallucination-detection",
     "copilot",
-    "pre-commit"
+    "pre-commit",
+    "claude-code-plugin",
+    "npx"
   ],
   "homepage": "https://fguerreir0.github.io/ghostimport/",
   "bugs": {
@@ -52,7 +55,9 @@
     "ghostimport": "dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    ".claude-plugin/plugin.json",
+    "hooks"
   ],
   "engines": {
     "node": ">=22"
@@ -67,7 +72,8 @@
     "prepublishOnly": "npm run build",
     "release": "pwsh -File deploy.ps1",
     "release:minor": "pwsh -File deploy.ps1 -Bump minor",
-    "release:major": "pwsh -File deploy.ps1 -Bump major"
+    "release:major": "pwsh -File deploy.ps1 -Bump major",
+    "version": "node scripts/sync-version.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",

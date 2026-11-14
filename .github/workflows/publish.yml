@@ -28,3 +28,23 @@ jobs:
       - run: npm test
 
       - run: npm publish --provenance --access public
+
+      # List the release in the official MCP Registry (registry.modelcontextprotocol.io).
+      # The registry checks that the npm package carries the same `mcpName` as server.json,
+      # so this must run after npm publish. Login uses this job's OIDC token — no secret.
+      # Pinned: upgrade by changing MCP_PUBLISHER_VERSION deliberately.
+      - name: Publish to the MCP Registry
+        continue-on-error: true
+        env:
+          MCP_PUBLISHER_VERSION: v1.8.6
+        run: |
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" \
+            | tar xz mcp-publisher
+          ./mcp-publisher login github-oidc
+          # npm can take a few minutes to serve a new version; the registry verifies against it
+          for attempt in 1 2 3 4 5; do
+            if ./mcp-publisher publish; then exit 0; fi
+            echo "MCP Registry publish failed (attempt $attempt), retrying in 60s"
+            sleep 60
+          done
+          exit 1

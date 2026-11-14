@@ -15,8 +15,11 @@
 <meta property="og:site_name" content="ghostimport">
 <meta property="og:title" content="Release Notes — ghostimport">
 <meta property="og:description" content="What changed in each ghostimport release: new checks, fixes, and what to do when upgrading.">
-<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/logo.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ghostimport: Your AI invents a package name. Someone registers it. A dashed card shows an unregistered name, a solid card a real package.">
+<meta name="twitter:card" content="summary_large_image">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -92,12 +95,87 @@
     </p>
   </header>
 
+  <!-- v0.7.0 -->
+  <article class="release" id="v0.7.0">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.0">v0.7.0</a></div>
+      <div class="date">2026-11-14</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <h2>Install</h2>
+      <ul>
+        <li>
+          <strong>A Claude Code plugin.</strong> <code>/plugin install ghostimport --marketplace FGuerreir0/ghostimport</code>
+          installs the blocking hooks and the MCP server together. The plugin runs the CLI bundled in the npm
+          package, so there's no global install, no hand-edited <code>settings.json</code>, and no
+          <code>npx</code> startup on every edit.
+        </li>
+        <li>
+          <strong>Listed in the official MCP Registry</strong> as <code>io.github.FGuerreir0/ghostimport</code>,
+          so MCP clients and directories that read the registry can find it.
+        </li>
+      </ul>
+
+      <h2>Agent hook</h2>
+      <ul>
+        <li>
+          <strong>Commands that download and run a package are checked.</strong> <code>npx</code>,
+          <code>npm exec</code>, <code>npm create</code> / <code>npm init &lt;x&gt;</code>, <code>pnpm dlx</code>,
+          <code>pnpx</code>, <code>yarn dlx</code>, <code>yarn create</code>, <code>bunx</code> and
+          <code>bun create</code> run a package's code immediately, with no postinstall needed. The hook now
+          denies them when the package doesn't exist or looks malicious, as it already did for installs.
+          <code>npm create vite</code> is checked as <code>create-vite</code>.
+        </li>
+        <li>
+          An unpinned <code>npx</code> of a bin the project already has installed (<code>npx tsc</code>) runs
+          the local copy, so it isn't checked.
+        </li>
+        <li>
+          The command reader understands quotes, <code>bash -c '…'</code> and <code>pwsh -Command</code>
+          scripts, <code>sudo</code> and <code>env</code> prefixes, and redirections:
+          <code>npm i axios &gt; log.txt</code> no longer reads <code>log.txt</code> as a package.
+        </li>
+      </ul>
+
+      <h2>CI</h2>
+      <ul>
+        <li>
+          The GitHub Action runs the ghostimport version matching its own tag instead of
+          <code>@latest</code>, lists supply-chain findings in the step summary, and skips cleanly when the
+          registry is unreachable.
+        </li>
+        <li>
+          The action's <code>missing</code>, <code>risks</code>, <code>packages</code> and <code>result</code>
+          outputs now work. They were declared without values before, so they were always empty.
+        </li>
+      </ul>
+
+      <h2>API</h2>
+      <ul>
+        <li>
+          New: <code>extractCommandTargets(command, { cwd? })</code> returns every package a command would
+          install or run, each with <code>action: 'install' | 'exec'</code>.
+          <code>extractInstallTargets</code> is unchanged.
+        </li>
+      </ul>
+
+      <h2>Upgrading</h2>
+      <ul>
+        <li>No breaking API changes.</li>
+        <li>
+          If you wired the hook into <code>.claude/settings.json</code> by hand, you can keep it or switch to
+          the plugin. Don't run both, or every command is checked twice.
+        </li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.6.1 -->
   <article class="release" id="v0.6.1">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.6.1">v0.6.1</a></div>
       <div class="date">2026-11-11</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <p>
