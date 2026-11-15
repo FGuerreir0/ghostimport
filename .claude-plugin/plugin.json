@@ -1,7 +1,7 @@
 {
   "name": "ghostimport",
   "displayName": "ghostimport",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "Stops Claude installing or running npm packages that don't exist, typosquats, and brand-new packages with install scripts. Blocking hooks plus an MCP server. Zero dependencies, no account.",
   "author": {
     "name": "Fábio Guerreiro",

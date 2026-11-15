@@ -57,6 +57,26 @@ assert(includes(extractImports(`export { x } from 'some-pkg'`), 'some-pkg'), 'de
 assert(!includes(extractImports(`var x = ' + obj.partner'`), ' + obj.partner'), 'rejects expressions with spaces and operators')
 assert(!includes(extractImports(`require(' + ISO_CODES[obj.partner.toLowerCase()]')`), ' + ISO_CODES[obj.partner.toLowerCase()]'), 'rejects expressions with brackets')
 assert(!includes(extractImports("import 'multi\nline'"), 'multi'), 'rejects cross-line matches')
+// Found scanning 1000 AI-built repos: none of these load a module.
+const only = (code: string): string => extractImports(code).join(',')
+assert(only("// import { x } from 'commented-out'\nimport z from 'zod'") === 'zod', 'ignores an import in a line comment')
+assert(only("/**\n * import { y } from 'jsdoc-example'\n */\nimport z from 'zod'") === 'zod', 'ignores an import in a JSDoc example')
+assert(only('const src = `export * from "fixture-pkg"`\nimport z from "zod"') === 'zod', 'ignores code inside a template string')
+assert(only(`const c = "export * from 'string-pkg'"`) === '', 'ignores code inside a plain string')
+assert(only(`access.require("session.read"); bundle.require('manual-cutover')`) === '', 'ignores a method named require')
+assert(only(`loader.import('not-a-module')`) === '', 'ignores a method named import')
+assert(only("const s = `${a ? `x` : 'y'} and ${b}`\nimport z from 'zod'") === 'zod', 'handles nested template literals')
+assert(only(`const re = /['"]/g\nimport z from 'zod'`) === 'zod', 'a quote inside a regex does not open a string')
+assert(only(`const half = a / 2; const b = c / d\nimport z from 'zod'`) === 'zod', 'division is not a regex')
+assert(only(`const el = <p>Don't</p>\nimport z from 'zod'`) === 'zod', 'an apostrophe in JSX text only affects its own line')
+assert(only(`const url = 'https://x.dev' // see import x from 'nope'\nconst m = require('express')`) === 'express', 'a // inside a string is not a comment')
+assert(only(`import type { A } from 'type-pkg'`) === 'type-pkg', 'still reads import type')
+assert(only(`import x = require('ts-require')`) === 'ts-require', 'still reads TypeScript import = require()')
+assert(only(`export * from 'reexported'`) === 'reexported', 'still reads export * from')
+assert(only(`import 'side-effect-pkg'`) === 'side-effect-pkg', 'still reads a side-effect import')
+assert(only("const s = `${await import('in-template')}`") === 'in-template', 'reads a dynamic import inside ${}')
+assert(only("const m = await import(\n            '@opentelemetry/api'\n        )") === '@opentelemetry/api', 'reads a dynamic import whose specifier is on the next line')
+assert(only("const x = foo(\n                         /['\"]/g)\nimport z from 'zod'") === 'zod', 'spots a regex after a long run of indentation')
 
 // ─── extractSfcScripts ───────────────────────────────────────────────────────
 
@@ -481,6 +501,10 @@ write('deno.json', { imports: {} })
 write('imports-config.json', { imports: { 'not-a-map': './x.js' }, buildTarget: 'es2020' })
 write('packages/sdk/package.json', { name: '@acme/sdk', dependencies: { lodash: '^4.17.0' } })
 write('packages/sdk/tsconfig.json', { compilerOptions: { paths: { '@utils/*': ['./utils/*'] } } })
+write('apps/web/package.json', { name: 'web', dependencies: {
+  'zod-3': 'npm:zod@^3', 'git-dep': 'github:user/git-dep#v1', 'tar-dep': 'https://example.com/t.tgz',
+  '@local/lib': 'file:../lib', express: '^4.0.0',
+} })
 
 const ctx = readProjectContext(ctxDir)
 const resolves = (pkg: string): boolean => isResolvedLocally(pkg, ctx)
@@ -494,6 +518,14 @@ assert(resolves('@theme/Layout'), 'Docusaurus projects resolve @theme themselves
 assert(resolves('@std/assert'), 'a Deno project resolves @std from JSR, not npm')
 assert(!resolves('not-a-map'), 'a JSON file that is not an import map is ignored')
 assert(!resolves('react'), 'an ordinary dependency still goes to the registry')
+// Found scanning 1000 AI-built repos: the key of an npm: alias or a git/tarball/file
+// dependency is what the code imports, and npm never looks that name up.
+assert(resolves('zod-3'), 'the key of an npm: alias resolves locally')
+assert(resolves('git-dep'), 'a github: dependency resolves locally')
+assert(resolves('tar-dep'), 'a tarball dependency resolves locally')
+assert(resolves('@local/lib'), 'a file: dependency resolves locally')
+assert(!resolves('express'), 'a plain registry dependency still goes to npm')
+assert(ctx.manifestDeps.has('zod'), 'the real package behind an npm: alias is still checked')
 assert(ctx.manifestDeps.get('lodash')?.[0]?.endsWith(path.join('packages', 'sdk', 'package.json')) === true, 'records which package.json declares a dependency')
 
 fs.rmSync(ctxDir, { recursive: true })

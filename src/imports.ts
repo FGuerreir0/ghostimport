@@ -1,10 +1,116 @@
-// Capture group uses [^'"\r\n] to prevent cross-line matches on CRLF files
+// Capture group uses [^'"\r\n] to prevent cross-line matches on CRLF files.
+// The lookbehind keeps `bundle.require("x")` and `loader.import("x")` out: a method
+// that happens to be called require is not a module load.
 const IMPORT_PATTERNS: RegExp[] = [
-  /import\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
-  /require\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
-  /import\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
-  /export\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
+  /(?<![\w$.])import\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
+  /(?<![\w$.])require\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
+  /(?<![\w$.])import\s*\(\s*['"]([^'".\r\n][^'"\r\n]*)['"]\s*\)/g,
+  /(?<![\w$.])export\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'".\r\n][^'"\r\n]*)['"]/g,
 ]
+
+// A string literal is kept only where a module specifier can stand.
+const SPECIFIER_CONTEXT = /(?:(?<![\w$.])(?:from|import|export)|(?<![\w$.])(?:require|import)\s*\()\s*$/
+// After one of these, a `/` starts a regex literal rather than a division.
+const REGEX_PRECEDER = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|(?<![\w$])(?:return|typeof|case|do|else|in|of|void|yield|await|delete|throw|new))\s*$/
+
+/**
+ * Blank out everything that cannot hold an import: comments, template literals and
+ * the contents of strings that aren't in specifier position. Offsets and newlines are
+ * kept, so the patterns above still see real imports exactly where they were.
+ *
+ * Without this, `// import x from 'old-pkg'`, a JSDoc usage example, or code inside a
+ * template string (`esbuild({ stdin: { contents: \`export * from 'fixture'\` } })`)
+ * all read as imports.
+ */
+export function stripNonCode(code: string): string {
+  const out: string[] = []
+  const blank = (s: string) => s.replace(/[^\n]/g, ' ')
+  // Template literal nesting: each entry is the brace depth at which a `${` opened.
+  const templates: number[] = []
+  let depth = 0
+  let i = 0
+  const n = code.length
+
+  // The output just before the current position, holding at least `len` non-blank
+  // characters. Whitespace is pushed a character at a time, so a fixed number of
+  // entries can be nothing but the indentation before `'pkg'` on its own line.
+  const tail = (len: number): string => {
+    let s = ''
+    for (let k = out.length - 1; k >= 0 && k >= out.length - 400; k--) {
+      s = out[k] + s
+      if (s.replace(/\s+/g, '').length >= len) break
+    }
+    return s
+  }
+
+  const readTemplateBody = () => {
+    // Inside a template literal, up to the closing backtick or a `${`.
+    let j = i
+    while (j < n) {
+      const c = code[j]
+      if (c === '\\') { j += 2; continue }
+      if (c === '`') break
+      if (c === '$' && code[j + 1] === '{') break
+      j++
+    }
+    out.push(blank(code.slice(i, j)))
+    i = j
+    if (code[i] === '`') { out.push('`'); i++ }
+    else if (i < n) { out.push('${'); i += 2; templates.push(depth); depth++ }
+  }
+
+  while (i < n) {
+    const c = code[i]
+    const next = code[i + 1]
+    if (c === '/' && next === '/') {
+      const end = code.indexOf('\n', i)
+      const stop = end === -1 ? n : end
+      out.push(blank(code.slice(i, stop)))
+      i = stop
+    } else if (c === '/' && next === '*') {
+      const end = code.indexOf('*/', i + 2)
+      const stop = end === -1 ? n : end + 2
+      out.push(blank(code.slice(i, stop)))
+      i = stop
+    } else if (c === '`') {
+      out.push('`'); i++
+      readTemplateBody()
+    } else if (c === '}' && templates.length && templates[templates.length - 1] === depth - 1) {
+      templates.pop(); depth--
+      out.push('}'); i++
+      readTemplateBody()
+    } else if (c === "'" || c === '"') {
+      // Strings never span lines (a line continuation aside), so a stray apostrophe in
+      // JSX text can only blank the rest of its own line.
+      let j = i + 1
+      while (j < n && code[j] !== c && code[j] !== '\n') j += code[j] === '\\' ? 2 : 1
+      const body = code.slice(i + 1, Math.min(j, n))
+      const keep = SPECIFIER_CONTEXT.test(tail(40))
+      out.push(c, keep ? body : blank(body))
+      if (code[j] === c) out.push(c)
+      i = code[j] === c ? j + 1 : j
+    } else if (c === '/' && REGEX_PRECEDER.test(tail(20))) {
+      // Regex literal: skip it so a quote inside /['"]/ doesn't open a fake string.
+      let j = i + 1
+      let inClass = false
+      while (j < n && code[j] !== '\n') {
+        const d = code[j]
+        if (d === '\\') { j += 2; continue }
+        if (d === '[') inClass = true
+        else if (d === ']') inClass = false
+        else if (d === '/' && !inClass) break
+        j++
+      }
+      if (code[j] === '/') { out.push(blank(code.slice(i, j + 1))); i = j + 1 }
+      else { out.push(c); i++ } // not a regex after all
+    } else {
+      if (c === '{') depth++
+      else if (c === '}') depth--
+      out.push(c); i++
+    }
+  }
+  return out.join('')
+}
 
 const BUILTIN_MODULES = new Set([
   'assert', 'assert/strict', 'async_hooks', 'buffer', 'child_process',
@@ -61,7 +167,8 @@ function toPackageName(importPath: string): string | null {
   return isValidNpmName(name) ? name : null
 }
 
-export function extractImports(code: string): string[] {
+export function extractImports(source: string): string[] {
+  const code = stripNonCode(source)
   const found = new Set<string>()
   for (const pattern of IMPORT_PATTERNS) {
     pattern.lastIndex = 0

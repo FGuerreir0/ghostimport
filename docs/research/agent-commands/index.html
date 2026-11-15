@@ -222,7 +222,7 @@ td .no { color: var(--breach); }
 
     <p style="margin-top:22px">
       So every one was a false alarm, and most of them are ghostimport's fault. The four biggest
-      causes are listed under Finding 04.
+      causes are fixed in 0.7.3; see Finding 04.
     </p>
   </section>
 
@@ -357,13 +357,19 @@ td .no { color: var(--breach); }
     </div>
     <p style="margin-top:22px">All six are fixed in 0.7.2, each with a test.</p>
 
+    <h3>Fixed in 0.7.3</h3>
+    <p>Checking the 141 import names in Finding 01 turned up four more bugs:</p>
+    <ul>
+      <li>Import statements inside comments were reported as imports.</li>
+      <li>So was code inside strings and template literals.</li>
+      <li><code>something.require("x")</code> was read as a <code>require</code> call.</li>
+      <li>Dependencies installed from GitHub, a tarball or under an alias
+        (<code>npm:</code>, <code>github:</code>, <code>file:</code>) were looked up on npm and
+        reported as missing.</li>
+    </ul>
+
     <h3>Still not fixed</h3>
     <ul>
-      <li>Import statements inside comments and strings are reported as imports.</li>
-      <li><code>something.require("x")</code> is read as a <code>require</code> call.</li>
-      <li>Dependencies installed from GitHub, a tarball or under an alias
-        (<code>npm:</code>, <code>github:</code>, <code>file:</code>) are looked up on npm and
-        reported as missing.</li>
       <li>The "free to register" check ignores npm's punctuation rule, so it overcounts.</li>
       <li>Type-only imports of packages that exist only as <code>@types/*</code>, like
         <code>estree</code>, are reported as missing.</li>

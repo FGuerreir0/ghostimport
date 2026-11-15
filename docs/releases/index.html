@@ -95,12 +95,52 @@
     </p>
   </header>
 
+  <!-- v0.7.3 -->
+  <article class="release" id="v0.7.3">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.3">v0.7.3</a></div>
+      <div class="date">2026-11-15</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <p>
+        Four more false-positive fixes, in the import scanner this time. I opened all 141 names the
+        <a href="../research/agent-commands/">1,000-repo scan</a> flagged outside test folders, and
+        none was a made-up import. These four bugs explain most of them. They affected the CLI, the
+        MCP <code>scan_project</code> tool and the hook that checks files an agent edits.
+      </p>
+      <h2>Import scanner</h2>
+      <ul>
+        <li>
+          <strong>Comments and strings are no longer read as imports.</strong>
+          <code>// import x from 'old-pkg'</code>, a JSDoc usage example, or code inside a template
+          string (an esbuild <code>stdin</code> fixture, a code sample on a docs page) were all reported
+          as imports of packages that don't exist.
+        </li>
+        <li>
+          A method that happens to be called <code>require</code> or <code>import</code>
+          (<code>access.require("session.read")</code>, <code>bundle.require("x")</code>) is no longer
+          read as a module load.
+        </li>
+        <li>
+          <strong>Dependencies that don't come from the npm registry are no longer reported missing.</strong>
+          Code that imports the key of an <code>npm:</code> alias (<code>"zod-3": "npm:zod@3"</code>), or a
+          dependency installed from GitHub, git, a tarball URL or <code>file:</code>, resolves locally. The
+          real package behind an <code>npm:</code> alias is still checked.
+        </li>
+        <li>
+          Imports with a comment inside the braces (<code>import {<br>&nbsp;&nbsp;A, // used by X<br>} from 'pkg'</code>)
+          are now read. Before, they were silently skipped.
+        </li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.7.2 -->
   <article class="release" id="v0.7.2">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.2">v0.7.2</a></div>
       <div class="date">2026-11-14</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <p>

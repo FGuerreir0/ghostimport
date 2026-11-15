@@ -111,6 +111,11 @@ export interface ProjectContext {
   manifestDeps: Map<string, string[]>
   /** The `name` of any package.json in the tree — a local package, however it is laid out. */
   local: Set<string>
+  /**
+   * Dependencies installed under their key without the registry ever seeing that name:
+   * `"zod-3": "npm:zod@3"`, `"x": "github:user/x"`, git, tarball and file specs.
+   */
+  installedAs: Set<string>
   /** Bare specifiers answered by a tsconfig path alias or an import map. */
   aliases: Set<string>
   /** Scopes a bundler resolves rather than the registry, e.g. Docusaurus `@theme/*`. */
@@ -133,7 +138,7 @@ const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'opti
  * Skips specs that never reach the registry — workspace, file, link, git and URL
  * dependencies, GitHub shorthand — and follows `npm:` aliases to the real name.
  */
-export function registryDeps(pkg: PackageJsonShape): string[] {
+export function registryDeps(pkg: PackageJsonShape, installedAs?: Set<string>): string[] {
   const names = new Set<string>()
   for (const field of DEP_FIELDS) {
     const deps: unknown = pkg[field]
@@ -149,6 +154,8 @@ export function registryDeps(pkg: PackageJsonShape): string[] {
       else if (/^[a-z][a-z0-9+.-]*:/i.test(spec) || /^[./~]/.test(spec) || spec.includes('/')) real = null
       else real = specToPackageName(name)
       if (real) names.add(real)
+      // The key is what code imports; npm only ever looks up `real` (or nothing).
+      if (real !== specToPackageName(name)) installedAs?.add(name)
     }
   }
   return [...names]
@@ -172,6 +179,7 @@ export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectCont
   const local = new Set<string>()
   const aliases = new Set<string>()
   const virtualScopes = new Set<string>()
+  const installedAs = new Set<string>()
 
   for (const file of files.packageJson) {
     let pkg: PackageJsonShape | null
@@ -181,7 +189,7 @@ export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectCont
     for (const field of DEP_FIELDS) {
       for (const name of Object.keys(pkg[field] ?? {})) declared.add(name)
     }
-    for (const name of registryDeps(pkg)) {
+    for (const name of registryDeps(pkg, installedAs)) {
       if (!manifestDeps.has(name)) manifestDeps.set(name, [])
       manifestDeps.get(name)!.push(file)
     }
@@ -221,12 +229,12 @@ export function contextFromFiles(files: ProjectFiles, _dir: string): ProjectCont
   // Deno projects import from JSR, which is not the npm registry.
   if (files.denoDetected) virtualScopes.add('@std').add('@deno')
 
-  return { declared, manifestDeps, local, aliases, virtualScopes }
+  return { declared, manifestDeps, local, installedAs, aliases, virtualScopes }
 }
 
 /** Does anything in the project already answer for this bare specifier? */
 export function isResolvedLocally(pkg: string, ctx: ProjectContext): boolean {
-  if (ctx.local.has(pkg) || ctx.aliases.has(pkg)) return true
+  if (ctx.local.has(pkg) || ctx.installedAs.has(pkg) || ctx.aliases.has(pkg)) return true
   // A scoped import matches an alias or virtual scope recorded as its first segment,
   // e.g. the alias "@commands" answers the import "@commands/types".
   const scope = pkg.split('/')[0]
