@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What Is Slopsquatting? AI-Invented Package Names, Explained</title>
+<meta name="description" content="Slopsquatting is registering a package name that AI coding tools invent, so that code which installs it runs the attacker's package. How it works, how often models make names up, and how to prevent it.">
+<meta name="keywords" content="slopsquatting, what is slopsquatting, hallucinated package, AI package hallucination, slopsquatting vs typosquatting, prevent slopsquatting, npm supply chain attack">
+<meta name="author" content="Fábio Guerreiro">
+<link rel="icon" type="image/svg+xml" href="../assets/favicon.svg">
+<link rel="icon" type="image/png" href="../assets/logo.png">
+<link rel="apple-touch-icon" href="../assets/logo.png">
+<link rel="canonical" href="https://fguerreir0.github.io/ghostimport/slopsquatting/">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://fguerreir0.github.io/ghostimport/slopsquatting/">
+<meta property="og:site_name" content="ghostimport">
+<meta property="og:title" content="What Is Slopsquatting? AI-Invented Package Names, Explained">
+<meta property="og:description" content="An attacker registers a package name that AI coding tools invent. How it works, how often it happens, and how to prevent it.">
+<meta property="og:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="ghostimport: Your AI invents a package name. Someone registers it. A dashed card shows an unregistered name, a solid card a real package.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="What Is Slopsquatting? AI-Invented Package Names, Explained">
+<meta name="twitter:description" content="An attacker registers a package name that AI coding tools invent. How it works, how often it happens, and how to prevent it.">
+<meta name="twitter:image" content="https://fguerreir0.github.io/ghostimport/assets/og-card.png">
+
+<!-- Structured data. Every figure and answer below also appears in the page body. -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "TechArticle",
+      "headline": "What is slopsquatting?",
+      "description": "Slopsquatting is registering a package name that AI coding tools invent, so that code which installs it runs the attacker's package. How it works, how often models make names up, and how to prevent it.",
+      "datePublished": "2026-11-17",
+      "dateModified": "2026-11-17",
+      "inLanguage": "en",
+      "url": "https://fguerreir0.github.io/ghostimport/slopsquatting/",
+      "author": { "@type": "Person", "name": "Fábio Guerreiro" },
+      "about": { "@id": "https://fguerreir0.github.io/ghostimport/slopsquatting/#term" },
+      "citation": [
+        "https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen",
+        "https://www.theregister.com/2025/04/12/ai_code_suggestions_sabotage_supply_chain/",
+        "https://www.theregister.com/2024/03/28/ai_bots_hallucinate_software_packages/",
+        "https://fguerreir0.github.io/ghostimport/research/",
+        "https://fguerreir0.github.io/ghostimport/research/agent-commands/"
+      ]
+    },
+    {
+      "@type": "DefinedTerm",
+      "@id": "https://fguerreir0.github.io/ghostimport/slopsquatting/#term",
+      "name": "Slopsquatting",
+      "description": "A software supply-chain attack in which someone registers a package name that AI coding tools invent, so that any project or agent that installs the invented name gets the attacker's package instead of an install error."
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "Has slopsquatting been used in a real attack?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The public cases so far are researchers and defenders registering invented names first. In 2024 a researcher published a harmless placeholder under huggingface-cli, a name chatbots kept recommending, and a README from Alibaba's GraphTranslator project told people to install it. Security vendors have registered placeholder packages for command names that docs get wrong. The attack needs nothing more than a free npm or PyPI account."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does a lockfile protect me from slopsquatting?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Only for packages already in it. A lockfile pins what you installed before. It does nothing for a new install command an AI agent runs, or for an npx command, which downloads and runs a package without adding it to your project."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is slopsquatting only an npm problem?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Any registry where names are first come, first served is exposed, including PyPI. The USENIX Security 2025 study measured invented package names in both Python and JavaScript code."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why does it matter more with AI coding agents?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A person who reads an install command for a package that doesn't exist usually notices. An agent runs it. Agents also read README files and instruction files like CLAUDE.md and AGENTS.md and follow the install and npx commands in them, so an invented or mistyped name in those files gets executed without anyone looking at it."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+
+<style>
+/* Page-specific layout only, shared with the field reports. Identity lives in site.css. */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 26px 0 0; font-family: var(--mono); font-size: 13px;
+}
+.topbar a { color: var(--muted); text-decoration: none; }
+.topbar a:hover { color: var(--phantom); }
+.topbar .home { display: inline-flex; align-items: center; gap: 9px; color: var(--bone); }
+.topbar .home img { width: 24px; height: 24px; }
+
+.masthead { padding: 54px 0 40px; border-bottom: 1px solid var(--line-soft); }
+.masthead h1 { font-size: clamp(34px, 5.6vw, 58px); max-width: 20ch; }
+.masthead .lede { font-size: 19px; color: var(--muted); max-width: var(--prose); margin: 20px 0 0; }
+.masthead .lede strong { color: var(--bone); font-weight: 600; }
+
+.dateline {
+  display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px;
+  font-family: var(--mono); font-size: 12px; color: var(--faint);
+}
+.dateline b { color: var(--muted); font-weight: 500; }
+
+section { padding: 52px 0; border-bottom: 1px solid var(--line-soft); }
+section h2 { font-size: clamp(25px, 3.4vw, 34px); max-width: 24ch; }
+section p, section li { max-width: var(--prose); color: var(--muted); }
+section p strong, section li strong { color: var(--bone); font-weight: 600; }
+section h3 { font-size: 19px; margin: 34px 0 10px; color: var(--bone); }
+section ul, section ol { padding-left: 20px; }
+section li { margin: 8px 0; }
+
+/* Dashed frame = a name nobody owns, per the site motif. */
+.figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin: 30px 0 8px; }
+.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 22px; }
+.fig.phantom { border-style: dashed; border-color: var(--phantom-d); background: rgba(168,168,240,.05); }
+.fig .n { font-family: var(--display); font-size: 40px; font-weight: 700; line-height: 1; color: var(--bone); letter-spacing: -.03em; }
+.fig.phantom .n { color: var(--phantom); }
+.fig .l { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-top: 12px; }
+.fig .s { font-size: 14px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+
+.callout {
+  border-left: 3px solid var(--phantom-d); background: rgba(168,168,240,.05);
+  padding: 18px 22px; border-radius: 0 10px 10px 0; margin: 28px 0;
+}
+.callout p { margin: 0; color: var(--bone); max-width: none; }
+
+.qa h3 { margin-top: 30px; }
+.qa h3:first-of-type { margin-top: 24px; }
+.sources li { font-size: 15px; }
+
+@media (max-width: 640px) {
+  .masthead { padding: 34px 0 28px; }
+  section { padding: 38px 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <nav class="topbar">
+    <a class="home" href="../"><img src="../assets/logo.png" alt="">ghostimport</a>
+    <span><a href="../research/agent-commands/">Field report</a> &nbsp; <a href="../docs/">Docs</a> &nbsp; <a href="https://github.com/FGuerreir0/ghostimport">GitHub</a></span>
+  </nav>
+
+  <header class="masthead">
+    <p class="eyebrow">Explainer</p>
+    <h1>What is slopsquatting?</h1>
+    <p class="lede">
+      <strong>Slopsquatting is registering a package name that AI coding tools make up.</strong>
+      Language models sometimes write imports and install commands for packages that were never
+      published. Anyone can register such a name on npm or PyPI. After that, every project or agent
+      that installs it gets the attacker's package instead of an error.
+    </p>
+    <div class="dateline">
+      <span><b>Updated</b> 2026-11-17</span>
+      <span><b>By</b> Fábio Guerreiro</span>
+      <span><b>Reading time</b> 6 min</span>
+    </div>
+  </header>
+
+  <!-- How it works -->
+  <section id="how">
+    <p class="eyebrow">How it works</p>
+    <h2>Four steps, and only the last one needs an attacker</h2>
+    <ol>
+      <li><strong>A model invents a package name.</strong> It predicts what a package for the job
+        would plausibly be called, such as <code>react-server-fetch</code>, and writes an import or
+        an <code>npm install</code> for it. Nothing by that name has been published.</li>
+      <li><strong>The name gets written down.</strong> It ends up in code, a README, a tutorial or an
+        agent instruction file like <code>CLAUDE.md</code> or <code>AGENTS.md</code>. Some models
+        produce the same invented name again and again for similar prompts.</li>
+      <li><strong>Someone registers it.</strong> npm and PyPI names are first come, first served.
+        Publishing a package takes a free account and a minute.</li>
+      <li><strong>The install succeeds.</strong> Until now the install failed with a 404, which is
+        harmless. Now it downloads the attacker's package, and any <code>postinstall</code> script
+        in it runs on the developer's machine or in CI.</li>
+    </ol>
+    <div class="callout">
+      <p>
+        An invented name is harmless while nobody owns it. The danger is that installing it stops
+        failing once someone registers it, and nothing tells you that changed.
+      </p>
+    </div>
+  </section>
+
+  <!-- Origin -->
+  <section id="origin">
+    <p class="eyebrow">Where the term comes from</p>
+    <h2>"Slop" plus "typosquatting"</h2>
+    <p>
+      Seth Larson, the Python Software Foundation's security developer-in-residence, coined the
+      word. It spread in April 2025, when The Register covered research on how often code models
+      invent package names. "Slop" is low-quality AI output. "Typosquatting" is the older trick of
+      registering misspellings of popular packages.
+    </p>
+    <p>
+      The idea came before the name. In March 2024, Bar Lanyado of Lasso Security reported that
+      chatbots kept recommending a Python package called <code>huggingface-cli</code>, which didn't
+      exist. The real tool comes from the <code>huggingface_hub</code> package. He published an
+      empty placeholder under the invented name. A README in Alibaba's GraphTranslator repository
+      was found telling people to <code>pip install huggingface-cli</code>.
+    </p>
+  </section>
+
+  <!-- Frequency -->
+  <section id="frequency">
+    <p class="eyebrow">How often it happens</p>
+    <h2>Models invent names often, and repeat them</h2>
+    <p>
+      The largest study so far is <em>We Have a Package for You!</em> by Spracklen et al., presented
+      at USENIX Security 2025. The authors had 16 code models write Python and JavaScript code, then
+      checked every package name against the registries.
+    </p>
+
+    <div class="figures">
+      <div class="fig">
+        <div class="n">576,000</div>
+        <div class="l">Code samples</div>
+        <div class="s">From 16 models, in Python and JavaScript.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">205,474</div>
+        <div class="l">Unique invented names</div>
+        <div class="s">Package names that didn't exist on PyPI or npm.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">43%</div>
+        <div class="l">Came back every time</div>
+        <div class="s">Share of invented names repeated in all ten reruns of the same prompt.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      On average, at least <strong>21.7%</strong> of the packages recommended by open-source models
+      and at least <strong>5.2%</strong> of those from commercial models didn't exist. 39% of the
+      invented names never came back when the prompt was rerun.
+    </p>
+    <p>
+      Repetition is what makes this attack practical. If a model produced a different invented name
+      every time, registering one would be a lottery ticket. Because many names come back reliably,
+      an attacker can generate code, collect the names that recur, and register those.
+    </p>
+  </section>
+
+  <!-- In real repos -->
+  <section id="field">
+    <p class="eyebrow">What turns up in real repositories</p>
+    <h2>The invented names are in the instructions, not the code</h2>
+    <p>
+      We scanned 174 public repositories in August 2026 and 991 built with AI agents in November.
+      In both, invented imports did not
+      reach committed code: an import that doesn't resolve breaks the build the first time someone
+      runs it, so it gets fixed. The risk was in places nothing checks.
+    </p>
+
+    <div class="figures">
+      <div class="fig">
+        <div class="n">0</div>
+        <div class="l">Invented imports in code</div>
+        <div class="s">Across 991 repos built with AI agents and 649,213 source files.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">560</div>
+        <div class="l">Command names not on npm</div>
+        <div class="s">In install and <code>npx</code> commands in READMEs and agent files.</div>
+      </div>
+      <div class="fig phantom">
+        <div class="n">404</div>
+        <div class="l">Repos, one unowned name</div>
+        <div class="s">From a project scaffold. The vendor reserved it after our report.</div>
+      </div>
+    </div>
+
+    <p style="margin-top:26px">
+      Coding agents read READMEs and instruction files and run the commands in them. A person who
+      sees <code>npm install your-cli-package-name</code> knows it's an example; an agent may just
+      run it. <code>npx</code> adds another gap: <code>npx foo</code> runs a local command called
+      <code>foo</code> if one is installed, and otherwise downloads the npm package named
+      <code>foo</code>, which may be someone else's.
+    </p>
+    <div class="cta-row" style="margin-top:24px">
+      <a class="btn" href="../research/agent-commands/">991 agent-built repos</a>
+      <a class="btn" href="../research/">The 404-repo scaffold name</a>
+    </div>
+  </section>
+
+  <!-- Comparison -->
+  <section id="compare">
+    <p class="eyebrow">Related attacks</p>
+    <h2>Slopsquatting vs typosquatting vs dependency confusion</h2>
+    <div class="table-scroll" style="margin-top:26px">
+      <table>
+        <thead><tr><th>Attack</th><th>Where the name comes from</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Slopsquatting</strong></td>
+            <td>An AI model invents a name that was never real</td>
+            <td><code>huggingface-cli</code> for <code>huggingface_hub</code></td>
+          </tr>
+          <tr>
+            <td><strong>Typosquatting</strong></td>
+            <td>A person mistypes a real, popular name</td>
+            <td><code>axois</code> for <code>axios</code></td>
+          </tr>
+          <tr>
+            <td><strong>Dependency confusion</strong></td>
+            <td>A company's private package name is registered on the public registry</td>
+            <td>An internal <code>acme-utils</code> published publicly with a higher version</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:22px">
+      Typosquatting needs a misspelling people actually make. Slopsquatting only needs a name a
+      model is likely to produce again. Since the name never existed, nothing like it is in a
+      vulnerability database, and it never reaches your lockfile while it fails to install.
+    </p>
+  </section>
+
+  <!-- Prevention -->
+  <section id="prevent">
+    <p class="eyebrow">Prevention</p>
+    <h2>How to prevent slopsquatting</h2>
+    <ul>
+      <li><strong>Check the name before you install.</strong> <code>npm view &lt;name&gt;</code>
+        or the package page on npmjs.com or pypi.org. A 404 means nobody has published it. A
+        package created last week with one version and no downloads deserves a closer look too.</li>
+      <li><strong>Install from your lockfile in CI.</strong> <code>npm ci</code> installs exactly
+        what was reviewed and fails instead of fetching something new.</li>
+      <li><strong>Name the package in <code>npx</code> commands.</strong> Write
+        <code>npx --package=dependency-cruiser depcruise</code>, not <code>npx depcruise</code>,
+        so the command can't resolve to a different package on a fresh clone.</li>
+      <li><strong>Check the commands in agent instruction files.</strong> Treat
+        <code>CLAUDE.md</code>, <code>AGENTS.md</code> and Cursor rules as scripts an agent will
+        run. Every install and <code>npx</code> line should name a package that exists.</li>
+      <li><strong>Gate the agent's installs.</strong> An agent hook runs on every tool call, whether
+        or not the model decides to check. It can block an install or <code>npx</code> command
+        before it runs. Install-time firewalls such as Socket Firewall and Aikido Safe Chain check
+        packages as they download.</li>
+    </ul>
+
+    <h3>Where ghostimport fits</h3>
+    <p>
+      ghostimport is a free, open-source checker for npm with no runtime dependencies. In Claude
+      Code it runs as a hook: it blocks install, <code>npx</code>, <code>dlx</code> and
+      <code>create</code> commands for packages that don't exist or look like typosquats, and
+      checks imports right after the agent writes them. It also works as an MCP server for Cursor,
+      Windsurf and other clients, and as a CLI for CI.
+    </p>
+    <div class="term" style="margin-top:20px">
+      <div class="term-bar"><i></i><i></i><i></i><span>check a repo</span></div>
+<pre><span class="d">$</span> <span class="w">npx ghostimport</span> <span class="p">./your-repo</span></pre>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="qa">
+    <p class="eyebrow">Questions</p>
+    <h2>More about slopsquatting</h2>
+
+    <h3>Has slopsquatting been used in a real attack?</h3>
+    <p>
+      The public cases so far are researchers and defenders registering invented names first. In
+      2024 a researcher published a harmless placeholder under <code>huggingface-cli</code>, a name
+      chatbots kept recommending, and a README from Alibaba's GraphTranslator project told people
+      to install it. Security vendors have registered placeholder packages for command names that
+      docs get wrong. The attack needs nothing more than a free npm or PyPI account.
+    </p>
+
+    <h3>Does a lockfile protect me from slopsquatting?</h3>
+    <p>
+      Only for packages already in it. A lockfile pins what you installed before. It does nothing
+      for a new install command an AI agent runs, or for an <code>npx</code> command, which
+      downloads and runs a package without adding it to your project.
+    </p>
+
+    <h3>Is slopsquatting only an npm problem?</h3>
+    <p>
+      No. Any registry where names are first come, first served is exposed, including PyPI. The
+      USENIX Security 2025 study measured invented package names in both Python and JavaScript
+      code.
+    </p>
+
+    <h3>Why does it matter more with AI coding agents?</h3>
+    <p>
+      A person who reads an install command for a package that doesn't exist usually notices. An
+      agent runs it. Agents also read README files and instruction files like
+      <code>CLAUDE.md</code> and <code>AGENTS.md</code> and follow the install and
+      <code>npx</code> commands in them, so an invented or mistyped name in those files gets
+      executed without anyone looking at it.
+    </p>
+  </section>
+
+  <!-- Sources -->
+  <section id="sources">
+    <p class="eyebrow">Sources</p>
+    <h2>Where these numbers come from</h2>
+    <ul class="sources">
+      <li>Spracklen et al., <a href="https://www.usenix.org/conference/usenixsecurity25/presentation/spracklen"><em>We Have a Package for You! A Comprehensive Analysis of Package Hallucinations by Code Generating LLMs</em></a>, USENIX Security 2025. Preprint on <a href="https://arxiv.org/abs/2406.10279">arXiv</a>.</li>
+      <li>The Register, <a href="https://www.theregister.com/2025/04/12/ai_code_suggestions_sabotage_supply_chain/">LLMs can't stop making up software dependencies and sabotaging everything</a>, April 2025. Origin of the term and the rerun figures.</li>
+      <li>The Register, <a href="https://www.theregister.com/2024/03/28/ai_bots_hallucinate_software_packages/">AI hallucinates software packages and devs download them</a>, March 2024. The <code>huggingface-cli</code> experiment.</li>
+      <li>ghostimport field reports: <a href="../research/">174 repos, August 2026</a> and <a href="../research/agent-commands/">991 agent-built repos, November 2026</a>.</li>
+    </ul>
+  </section>
+
+  <!-- Close -->
+  <section style="border-bottom:0">
+    <h2>Check the name before your agent installs it</h2>
+    <p>One command in Claude Code. Node 22+. Nothing to configure before it's useful.</p>
+    <div class="term" style="margin-top:20px">
+      <div class="term-bar"><i></i><i></i><i></i><span>claude code</span></div>
+<pre><span class="w">/plugin install ghostimport --marketplace FGuerreir0/ghostimport</span></pre>
+    </div>
+    <div class="cta-row" style="margin-top:28px">
+      <a class="btn primary" href="../docs/">Set up ghostimport</a>
+      <a class="btn" href="https://github.com/FGuerreir0/ghostimport">GitHub</a>
+    </div>
+  </section>
+
+  <footer>
+    <span>MIT licensed</span>
+    <a href="../">Home</a>
+    <a href="../docs/">Docs</a>
+    <a href="../research/">Field report</a>
+    <a href="../releases/">Releases</a>
+    <a href="https://github.com/FGuerreir0/ghostimport">github.com/FGuerreir0/ghostimport</a>
+    <a href="https://www.npmjs.com/package/ghostimport">npm</a>
+  </footer>
+
+</div>
+
+</body>
+</html>

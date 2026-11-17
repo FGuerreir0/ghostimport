@@ -1,0 +1,27 @@
+# ghostimport
+
+> ghostimport stops AI coding agents from installing or running npm packages that don't exist or look like typosquats, a defense against slopsquatting. It is free, MIT licensed, has zero runtime dependencies, and needs no account. It runs as a Claude Code plugin (hooks that block install, npx, dlx and create commands before they run, plus an import check after edits), as an MCP server for Cursor, Windsurf and other MCP clients, and as a CLI for CI.
+
+Key facts:
+
+- Install in Claude Code: `/plugin install ghostimport --marketplace FGuerreir0/ghostimport`
+- Install as a CLI: `npm install -g ghostimport`, or run `npx ghostimport` in a project
+- MCP server: `npx -y ghostimport mcp` (tools: `check_packages`, `check_install_command`, `scan_project`)
+- Requires Node.js 22+. Covers the npm registry; it does not check PyPI yet.
+- When the registry can't be reached, the hook fails open and does not block.
+
+## Docs
+
+- [What is slopsquatting?](https://fguerreir0.github.io/ghostimport/slopsquatting/): definition, how the attack works, how often models invent package names, and how to prevent it
+- [Setup and reference](https://fguerreir0.github.io/ghostimport/docs/): install, agent hooks, MCP config, CLI flags, config file, JavaScript API, risk signals, CI
+- [Release notes](https://fguerreir0.github.io/ghostimport/releases/): what changed in each version
+
+## Research
+
+- [The made-up names are in the instructions, not the code](https://fguerreir0.github.io/ghostimport/research/agent-commands/): November 2026 scan of 991 repos built with AI agents; no invented imports in code, 560 package names in README and agent-file commands that aren't on npm
+- [404 repositories imported a package nobody owned](https://fguerreir0.github.io/ghostimport/research/): August 2026 scan of 174 repos; an unregistered name from a project scaffold, since reserved by the vendor
+
+## Optional
+
+- [Source code](https://github.com/FGuerreir0/ghostimport)
+- [npm package](https://www.npmjs.com/package/ghostimport)
