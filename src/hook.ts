@@ -15,12 +15,13 @@
 
 import fs from 'fs'
 import path from 'path'
-import { extractImports } from './imports'
+import { extractImportKinds, isDeclarationFile } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
-import { CODE_EXTS, readProjectContext, isResolvedLocally, readManifestDeps } from './files'
+import { CODE_EXTS, readProjectContext, isResolvedLocally, readManifestDeps, type ProjectContext } from './files'
 import { loadConfig, matchesIgnore } from './config'
 import { extractCommandTargets } from './commands'
-import { verifyPackages, describeVerdict } from './verify'
+import { verifyPackages, describeVerdict, providedByTypes } from './verify'
+import { loadCache, saveCache } from './cache'
 import type { PackageVerdict } from './types'
 
 const ALLOW = 0
@@ -55,11 +56,11 @@ function readStdin(): Promise<string> {
 }
 
 /** Packages that are legitimately unresolvable against the registry in this project. */
-function localNames(cwd: string): (pkg: string) => boolean {
+function localNames(cwd: string): { isLocal: (pkg: string) => boolean; ctx: ProjectContext } {
   const config = loadConfig(cwd)
   // Depth-bounded: this runs on every edit, so it must not walk a huge tree.
   const ctx = readProjectContext(cwd, HOOK_SCAN_DEPTH)
-  return (pkg) => matchesIgnore(pkg, config.ignore) || isResolvedLocally(pkg, ctx)
+  return { isLocal: (pkg) => matchesIgnore(pkg, config.ignore) || isResolvedLocally(pkg, ctx), ctx }
 }
 
 function report(verdicts: PackageVerdict[], context: string, guidance: string): string {
@@ -77,7 +78,7 @@ async function checkInstallCommand(payload: HookPayload): Promise<{ code: number
   if (!command) return { code: ALLOW }
 
   const cwd = payload.cwd ?? process.cwd()
-  const isLocal = localNames(cwd)
+  const { isLocal } = localNames(cwd)
   // `cwd` lets an unpinned `npx tsc` through when the project already has that bin
   const dialect = payload.tool_name === 'PowerShell' ? 'powershell' : 'posix'
   const targets = extractCommandTargets(command, { cwd, dialect })
@@ -124,20 +125,32 @@ async function checkEditedFile(payload: HookPayload): Promise<{ code: number; me
   try { code = fs.readFileSync(filePath, 'utf8') } catch { return { code: ALLOW } }
   if (SFC_EXTS.has(ext)) code = extractSfcScripts(code, ext)
 
-  const isLocal = localNames(payload.cwd ?? process.cwd())
-  const imported = extractImports(code).filter(pkg => !isLocal(pkg)).slice(0, MAX_PACKAGES)
+  const { isLocal, ctx } = localNames(payload.cwd ?? process.cwd())
+  const kinds = extractImportKinds(code)
+  const imported = [...kinds.keys()].filter(pkg => !isLocal(pkg)).slice(0, MAX_PACKAGES)
   if (imported.length === 0) return { code: ALLOW }
 
   // Existence only — this runs after every single edit, so it has to stay cheap.
   // The 24h registry cache means the common case is zero network calls.
   const verdicts = await verifyPackages(imported)
-  const problems = verdicts.filter(v => v.status === 'missing')
+  let problems = verdicts.filter(v => v.status === 'missing')
+  if (problems.length === 0) return { code: ALLOW }
+
+  // A type-only import of a name that exists only as @types/* is not a broken import
+  const declaration = isDeclarationFile(filePath)
+  const cache = loadCache()
+  const typed = await providedByTypes(problems.map(v => v.pkg), {
+    declared: ctx.declared,
+    typeOnly: pkg => declaration || kinds.get(pkg) === false,
+  }, cache, true)
+  try { saveCache(cache) } catch { /* cache is best-effort */ }
+  problems = problems.filter(v => !typed.has(v.pkg))
   if (problems.length === 0) return { code: ALLOW }
 
   return {
     code: BLOCK,
     message: report(
-      verdicts,
+      problems,
       `${path.relative(payload.cwd ?? process.cwd(), filePath)} imports packages that do not exist on npm.`,
       'Fix the imports now: use a package that is actually published, or write the functionality yourself. ' +
       'Do not add these names to package.json.',
@@ -168,7 +181,7 @@ async function checkEditedManifest(payload: HookPayload, filePath: string): Prom
   const written = writtenText(payload.tool_input)
   const touched = written === null ? deps : deps.filter(pkg => written.includes(`"${pkg}"`))
 
-  const isLocal = localNames(payload.cwd ?? process.cwd())
+  const { isLocal } = localNames(payload.cwd ?? process.cwd())
   const declared = touched.filter(pkg => !isLocal(pkg)).slice(0, MAX_MANIFEST_PACKAGES)
   if (declared.length === 0) return { code: ALLOW }
 

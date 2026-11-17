@@ -6,6 +6,7 @@ import { loadConfig } from './config'
 import { CODE_EXTS } from './files'
 import { runMcpServer } from './mcp'
 import { runHook } from './hook'
+import { describeUnclaimable } from './verify'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const { version } = JSON.parse(
@@ -176,7 +177,8 @@ async function runScan() {
     if (problem.files.length > 3) console.log(`    ${c.gray(`↳ +${problem.files.length - 3} more files`)}`)
 
     if ('claimable' in problem && problem.claimable === false) {
-      console.log(`    ${c.gray('↳')} ${c.gray(`${problem.pkg.split('/')[0]} scope is owned — only its owner can publish this name`)}`)
+      const why = describeUnclaimable(problem.pkg, { reason: problem.unclaimableReason ?? 'scope', similarTo: problem.similarTo })
+      console.log(`    ${c.gray('↳')} ${c.gray(why)}`)
     }
     if (risk?.typosquatOf) {
       console.log(`    ${c.gray('↳')} ${c.yellow(`1-2 chars from '${risk.typosquatOf}' — likely a typo`)}`)

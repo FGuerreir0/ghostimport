@@ -6,11 +6,12 @@ import {
 import { extractSfcScripts } from '../src/sfc'
 import { loadConfig } from '../src/config'
 import { loadCache, saveCache } from '../src/cache'
-import { hasBlockingVerdict, describeVerdict } from '../src/verify'
+import { hasBlockingVerdict, describeVerdict, typesPackageFor } from '../src/verify'
 import { specToPackageName } from '../src/install'
 import { createPackageName } from '../src/commands'
 import { readProjectContext, isResolvedLocally, registryDeps } from '../src/files'
-import { checkScope, scoreRisk, type RiskSignals } from '../src/npm'
+import { checkScope, scoreRisk, punctuationVariants, type RiskSignals } from '../src/npm'
+import { extractImportKinds, isDeclarationFile } from '../src/imports'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
@@ -31,6 +32,36 @@ function assert(condition: boolean, label: string): void {
 
 function includes(arr: string[], value: string): boolean {
   return arr.includes(value)
+}
+
+// ─── extractImportKinds ──────────────────────────────────────────────────────
+
+console.log('\nextractImportKinds()')
+
+{
+  const kinds = extractImportKinds([
+    `import type { Node } from 'estree'`,
+    `import type Foo from 'type-default'`,
+    `export type { A } from 'type-reexport'`,
+    `export type * from 'type-star'`,
+    `import type from 'named-type'`,
+    `import { type A } from 'inline-type'`,
+    `import type { B } from 'both'`,
+    `import { c } from 'both'`,
+    `const x = require('required')`,
+  ].join('\n'))
+  assert(kinds.get('estree') === false, 'import type { … } is type-only')
+  assert(kinds.get('type-default') === false, 'import type X is type-only')
+  assert(kinds.get('type-reexport') === false, 'export type { … } from is type-only')
+  assert(kinds.get('type-star') === false, 'export type * from is type-only')
+  assert(kinds.get('named-type') === true, "import type from 'x' is a default import named type, so runtime")
+  assert(kinds.get('inline-type') === true, 'inline { type A } still emits the import under verbatimModuleSyntax, so runtime')
+  assert(kinds.get('both') === true, 'one runtime import makes a package runtime')
+  assert(kinds.get('required') === true, 'require() is runtime')
+  assert(isDeclarationFile('src/types.d.ts') && isDeclarationFile('x.d.mts') && !isDeclarationFile('src/app.ts'),
+    'recognises declaration files')
+  assert(typesPackageFor('estree') === '@types/estree' && typesPackageFor('@babel/core') === '@types/babel__core',
+    'maps a module to its DefinitelyTyped package')
 }
 
 // ─── extractImports ───────────────────────────────────────────────────────────
@@ -251,6 +282,33 @@ assert(scoreRisk({ ...established, versions: 1, maintainers: 1 }).risk === 'low'
 assert(scoreRisk({ ...established, ageDays: Infinity, versions: null, downloads: null }).risk === 'low',
   'unknown age, versions and downloads raise nothing')
 
+// Found scanning 1000 AI-built repos: when the downloads API doesn't answer, an old
+// single-version package was rated high, and the hook blocked it.
+const downloadsDown = scoreRisk({ ...established, versions: 1, maintainers: 1, downloads: null })
+assert(downloadsDown.risk === 'medium',
+  'with the downloads API down, an old single-version package is medium, not high (no block)')
+assert(downloadsDown.flags.includes('weekly downloads unavailable'),
+  'the flags say the download count was unavailable')
+assert(scoreRisk({ ...fresh, downloads: null }).risk === 'high',
+  'with the downloads API down, a brand-new single-version package is still high')
+assert(scoreRisk({ ...established, versions: 1, installScripts: ['postinstall'], downloads: null }).risk === 'high',
+  'with the downloads API down, an install script on a single version is still high')
+assert(scoreRisk({ ...established, ageDays: 10, downloads: null }).risk === 'high',
+  'with the downloads API down, a package created 10 days ago by one maintainer is still high')
+
+// ─── punctuationVariants (pure) ─────────────────────────────────────────────
+
+console.log('\npunctuationVariants()')
+
+assert(punctuationVariants('opencode').includes('open-code'), 'tries a hyphen at each position (opencode → open-code)')
+assert(punctuationVariants('react_dom').includes('react-dom'), 'swaps separators (react_dom → react-dom)')
+assert(punctuationVariants('react_dom').includes('reactdom'), 'drops separators (react_dom → reactdom)')
+assert(punctuationVariants('socketio').includes('socket.io'), 'tries a dotted .io / .js suffix (socketio → socket.io)')
+assert(!punctuationVariants('opencode').includes('opencode'), 'never lists the name itself')
+assert(punctuationVariants('@scope/pkg').length === 0, 'scoped names are not subject to the rule')
+assert(punctuationVariants('Install').length === 0, 'names with capitals are skipped (already unclaimable)')
+assert(punctuationVariants('a'.repeat(40)).length === 0, 'very long names are skipped to bound the requests')
+
 // ─── checkScary (live) ───────────────────────────────────────────────────────
 
 console.log('\ncheckPackageRisk() — live npm registry calls')
@@ -426,6 +484,21 @@ if (!networkAvailable) {
   assert(inOwned?.status === 'missing' && inOwned.claimable === false, 'a missing name in an owned scope is not claimable')
   assert(scoped.get('@zzqx-no-such-scope-ghostimport-8317/pkg')?.claimable === true, 'a missing name in a free scope is claimable')
   assert(!!inOwned && !describeVerdict(inOwned).includes('unregistered'), 'an owned-scope verdict does not call the name squattable')
+
+  // Found scanning 1000 AI-built repos: `npm install -g opencode` in 8 repos looked
+  // squattable, but npm refuses `opencode` because `open-code` exists.
+  const similar = new Map((await verifyPackages(['opencode', 'react_dom'])).map(v => [v.pkg, v]))
+  const opencode = similar.get('opencode')
+  assert(opencode?.status === 'missing' && opencode.claimable === false, 'a punctuation variant of an existing name is not claimable (opencode)')
+  assert(opencode?.unclaimableReason === 'similar' && opencode.similarTo === 'open-code', 'it names the package that blocks it (open-code)')
+  assert(similar.get('react_dom')?.similarTo === 'react-dom', 'separator swaps are caught (react_dom → react-dom)')
+  assert(!!opencode && describeVerdict(opencode).includes("'open-code'") && !describeVerdict(opencode).includes('scope'),
+    'the verdict explains the punctuation rule, not a scope')
+  assert(hasBlockingVerdict([opencode!]), 'an unclaimable missing name still blocks: the install would fail')
+
+  const capital = (await verifyPackages(['Install']))[0]
+  assert(capital?.unclaimableReason === 'case' && !describeVerdict(capital).includes('scope'),
+    'a capitalised name is explained by the capitals rule, not a scope')
 }
 
 // ─── scan ────────────────────────────────────────────────────────────────────
@@ -472,6 +545,36 @@ if (!networkAvailable) {
   assert(declaredOnly.risks.some(r => r.pkg === declaredFake), 'a declared unscoped name is still squattable')
   assert(!missingByName.has('shared'), 'workspace: dependencies never reach the registry')
   fs.rmSync(manifestDir, { recursive: true })
+
+  // Found scanning 1000 AI-built repos: `estree` exists only as @types/estree
+  const typesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ghostimport-types-'))
+  const typesWrite = (rel: string, text: string): void => {
+    fs.mkdirSync(path.dirname(path.join(typesDir, rel)), { recursive: true })
+    fs.writeFileSync(path.join(typesDir, rel), text)
+  }
+  typesWrite('package.json', JSON.stringify({ dependencies: {} }))
+  typesWrite('src/types-only.ts', `import type { Node } from 'estree'\n`)
+  const typeOnlyScan = await scan(typesDir, { deep: false })
+  assert(!typeOnlyScan.missing.some(m => m.pkg === 'estree'), 'a type-only import answered by an existing @types package is not missing')
+
+  typesWrite('src/runtime.ts', `import { walk } from 'estree'\n`)
+  const runtimeScan = await scan(typesDir, { deep: false })
+  assert(runtimeScan.missing.some(m => m.pkg === 'estree'), 'a runtime import of a types-only name is still missing')
+
+  typesWrite('package.json', JSON.stringify({ devDependencies: { '@types/estree': '^1.0.0' } }))
+  const declaredTypesScan = await scan(typesDir, { deep: false })
+  assert(!declaredTypesScan.missing.some(m => m.pkg === 'estree'), 'any import is excused when the project declares the @types package')
+
+  typesWrite('package.json', JSON.stringify({ dependencies: { estree: '^1.0.0' }, devDependencies: { '@types/estree': '^1.0.0' } }))
+  const manifestTypesScan = await scan(typesDir, { deep: false })
+  assert(manifestTypesScan.missing.some(m => m.pkg === 'estree'), 'a types-only name declared as a dependency is still missing: npm install looks it up')
+
+  fs.rmSync(path.join(typesDir, 'src', 'runtime.ts'))
+  typesWrite('package.json', JSON.stringify({ dependencies: {} }))
+  typesWrite('src/globals.d.ts', `import { Node } from 'estree'\n`)
+  const declarationScan = await scan(typesDir, { deep: false })
+  assert(!declarationScan.missing.some(m => m.pkg === 'estree'), 'imports in a .d.ts file count as type-only')
+  fs.rmSync(typesDir, { recursive: true })
 }
 
 fs.rmSync(scanDir, { recursive: true })
@@ -731,6 +834,16 @@ if (networkAvailable) {
     cwd: hookTmp,
   })
   assert(edited.code === 2, 'flags a hallucinated import written into a file')
+
+  const typesFile = path.join(hookTmp, 'types.ts')
+  fs.writeFileSync(typesFile, `import type { Node } from 'estree'\n`)
+  const typeOnlyEdit = await runHookProcess({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Edit',
+    tool_input: { file_path: typesFile },
+    cwd: hookTmp,
+  })
+  assert(typeOnlyEdit.code === 0, 'allows a type-only import answered by an @types package')
 
   const manifest = path.join(hookTmp, 'package.json')
   const manifestText = JSON.stringify({

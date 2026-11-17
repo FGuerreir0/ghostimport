@@ -95,12 +95,71 @@
     </p>
   </header>
 
+  <!-- v0.7.4 -->
+  <article class="release" id="v0.7.4">
+    <div class="rail">
+      <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.4">v0.7.4</a></div>
+      <div class="date">2026-11-17</div>
+      <span class="tag latest">Latest</span>
+    </div>
+    <div class="notes">
+      <p>
+        Fixes the three problems the <a href="../research/agent-commands/">1,000-repo scan</a> listed
+        as still open. The first one could make the agent hook block a good package.
+      </p>
+      <h2>Risk scoring</h2>
+      <ul>
+        <li>
+          <strong>A missing download count no longer blocks a package.</strong> npm's downloads API
+          rate-limits under load. When it didn't answer, an old package with one version and one
+          maintainer, like <code>server-only</code>, was rated high risk and the hook blocked it. Now,
+          if the package would not be high risk with real downloads behind it, it is rated medium and
+          flagged "weekly downloads unavailable". A package created in the last 30 days, a typosquat
+          with real downloads data, or an install script on a single version is still high. A timeout
+          or server error from the downloads API now gets one retry.
+        </li>
+      </ul>
+      <h2>Missing names</h2>
+      <ul>
+        <li>
+          <strong>Names npm would refuse are no longer reported as claimable.</strong> npm rejects a new
+          name that matches an existing one with <code>.</code>, <code>-</code> and <code>_</code> removed,
+          so nobody can register <code>opencode</code> while <code>open-code</code> exists. ghostimport now
+          looks up the likely spellings and says which package blocks the name. Re-checking the scan's
+          command names, this took 21 names off the claimable list. A missing name still blocks an
+          install, since the install would fail.
+        </li>
+        <li>
+          <strong>Type-only imports of <code>@types</code>-only names are no longer reported missing.</strong>
+          <code>import type { Node } from 'estree'</code> is answered by <code>@types/estree</code>; there is
+          no <code>estree</code> package. A missing name is skipped when the project declares its
+          <code>@types</code> package, or when it is only imported for types (<code>import type</code>,
+          <code>export type</code>, a <code>.d.ts</code> file) and the <code>@types</code> package exists. A
+          name declared in <code>package.json</code> is still reported, because <code>npm install</code>
+          looks it up.
+        </li>
+        <li>
+          Messages about a missing name nobody can claim now give the actual reason: an owned scope,
+          capital letters, or the punctuation rule. Before, the CLI said "scope is owned" for all of them.
+        </li>
+      </ul>
+      <h2>Upgrading</h2>
+      <ul>
+        <li>
+          No breaking changes. <code>MissingRef</code> and <code>PackageVerdict</code> gain optional
+          <code>unclaimableReason</code> and <code>similarTo</code> fields, and the
+          <code>UnclaimableReason</code> type is exported. Plugin users: update the plugin in
+          <code>/plugin</code> and start a new session.
+        </li>
+      </ul>
+    </div>
+  </article>
+
   <!-- v0.7.3 -->
   <article class="release" id="v0.7.3">
     <div class="rail">
       <div class="ver"><a href="https://github.com/FGuerreir0/ghostimport/releases/tag/v0.7.3">v0.7.3</a></div>
       <div class="date">2026-11-15</div>
-      <span class="tag latest">Latest</span>
     </div>
     <div class="notes">
       <p>

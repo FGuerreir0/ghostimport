@@ -1,7 +1,7 @@
 {
   "name": "ghostimport",
   "mcpName": "io.github.FGuerreir0/ghostimport",
-  "version": "0.7.3",
+  "version": "0.7.4",
   "description": "Stops AI coding agents from installing or running npm packages that don't exist. Claude Code plugin, MCP server and hooks that block slopsquatting and typosquat supply-chain attacks, including npx and create commands.",
   "keywords": [
     "npm",

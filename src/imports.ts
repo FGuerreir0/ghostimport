@@ -167,9 +167,18 @@ function toPackageName(importPath: string): string | null {
   return isValidNpmName(name) ? name : null
 }
 
-export function extractImports(source: string): string[] {
+// `import type X from`, `import type { A } from`, `export type * from`. Not
+// `import type from 'x'`, which is a default import named `type`. Inline
+// `import { type A }` is left out: under `verbatimModuleSyntax` it still emits the import.
+const TYPE_ONLY = /^(?:import|export)\s+type(?:\s*[{*]|\s+(?!from\b)[\w$])/
+
+/**
+ * Every package a source file imports, mapped to whether any of those imports loads
+ * it at runtime. `false` means only type-only imports name it, which TypeScript erases.
+ */
+export function extractImportKinds(source: string): Map<string, boolean> {
   const code = stripNonCode(source)
-  const found = new Set<string>()
+  const found = new Map<string, boolean>()
   for (const pattern of IMPORT_PATTERNS) {
     pattern.lastIndex = 0
     let match
@@ -177,9 +186,19 @@ export function extractImports(source: string): string[] {
       const raw = match[1]
       const pkg = toPackageName(raw)
       if (pkg && !isBuiltin(raw) && !isBuiltin(pkg)) {
-        found.add(pkg)
+        const runtime = !TYPE_ONLY.test(match[0])
+        found.set(pkg, (found.get(pkg) ?? false) || runtime)
       }
     }
   }
-  return [...found]
+  return found
+}
+
+export function extractImports(source: string): string[] {
+  return [...extractImportKinds(source).keys()]
+}
+
+/** A TypeScript declaration file: every import in it is type-only. */
+export function isDeclarationFile(file: string): boolean {
+  return /\.d\.[mc]?ts$/.test(file)
 }

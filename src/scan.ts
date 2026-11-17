@@ -1,12 +1,12 @@
 import fs from 'fs'
 import path from 'path'
-import { extractImports } from './imports'
+import { extractImportKinds, isDeclarationFile } from './imports'
 import { extractSfcScripts, SFC_EXTS } from './sfc'
 import { loadCache, saveCache, getCached } from './cache'
 import { loadConfig, matchesIgnore } from './config'
 import { checkNpm, checkPackageRisk, detectTyposquat } from './npm'
 import { walkProject, contextFromFiles, isResolvedLocally } from './files'
-import { checkClaimable } from './verify'
+import { applyClaim, checkClaimable, providedByTypes } from './verify'
 import type { CacheEntry, NpmCheckResult, ScanOptions, ScanResult } from './types'
 
 const CONCURRENCY = 10
@@ -28,14 +28,18 @@ export async function scan(
 
   // Collect all unique imports across all files, with file references
   const importMap = new Map<string, string[]>()
+  // Packages some file loads at runtime; the rest are only ever imported for types
+  const runtimeImports = new Set<string>()
   for (const file of files) {
     let code: string
     try { code = fs.readFileSync(file, 'utf8') } catch { continue }
     const ext = path.extname(file)
     if (SFC_EXTS.has(ext)) code = extractSfcScripts(code, ext)
-    for (const pkg of extractImports(code)) {
+    const declaration = isDeclarationFile(file)
+    for (const [pkg, runtime] of extractImportKinds(code)) {
       if (!importMap.has(pkg)) importMap.set(pkg, [])
       importMap.get(pkg)!.push(path.relative(targetDir, file))
+      if (runtime && !declaration) runtimeImports.add(pkg)
     }
   }
 
@@ -95,10 +99,22 @@ export async function scan(
     }
   }
 
-  // A missing name is squattable unless it sits in a scope someone already owns.
-  // One request per distinct scope; unscoped names cost nothing.
-  const claimable = await checkClaimable(results.missing.map(m => m.pkg), cache, useCache)
-  for (const entry of results.missing) entry.claimable = claimable.get(entry.pkg) ?? null
+  // `import type { Node } from 'estree'` is answered by @types/estree; there was never
+  // going to be an `estree` on npm. Names declared in a package.json are not excused:
+  // `npm install` looks those up under their own name.
+  if (results.missing.length > 0) {
+    const fromCode = results.missing.map(m => m.pkg).filter(pkg => !ctx.manifestDeps.has(pkg))
+    const typed = await providedByTypes(fromCode, {
+      declared: declaredDeps,
+      typeOnly: pkg => !runtimeImports.has(pkg),
+    }, cache, useCache)
+    results.missing = results.missing.filter(m => !typed.has(m.pkg))
+  }
+
+  // A missing name is squattable unless npm would refuse it to a stranger: an owned
+  // scope, capital letters, or a punctuation variant of an existing package.
+  const claims = await checkClaimable(results.missing.map(m => m.pkg), cache, useCache)
+  for (const entry of results.missing) applyClaim(entry, claims.get(entry.pkg))
 
   if (useCache) saveCache(cache)
   results.cacheHits = cacheHits

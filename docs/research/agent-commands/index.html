@@ -276,9 +276,9 @@ td .no { color: var(--breach); }
     <div class="callout">
       <p>
         ghostimport says up to 321 of the missing names could be registered by anyone, 18 of them
-        in agent instruction files. That's an upper bound: ghostimport doesn't check npm's
-        punctuation rule yet, and <code>opencode</code> shows that it matters. I'm not publishing
-        the list.
+        in agent instruction files. That's an upper bound: ghostimport didn't check npm's
+        punctuation rule at the time, and <code>opencode</code> shows that it matters. Since 0.7.4
+        it does. I'm not publishing the list.
       </p>
     </div>
   </section>
@@ -368,13 +368,15 @@ td .no { color: var(--breach); }
         reported as missing.</li>
     </ul>
 
-    <h3>Still not fixed</h3>
+    <h3>Fixed in 0.7.4</h3>
+    <p>These three were still open when this report was published:</p>
     <ul>
-      <li>The "free to register" check ignores npm's punctuation rule, so it overcounts.</li>
+      <li>The "free to register" check ignored npm's punctuation rule, so it overcounted. Re-checking
+        the command names on 2026-11-17 took 21 off the list, including <code>opencode</code>.</li>
       <li>Type-only imports of packages that exist only as <code>@types/*</code>, like
-        <code>estree</code>, are reported as missing.</li>
-      <li>When npm's downloads API doesn't answer, which happens on big runs, old single-version
-        packages fall to high risk. In the agent hook, that means a block the agent has to explain to you.</li>
+        <code>estree</code>, were reported as missing.</li>
+      <li>When npm's downloads API didn't answer, which happens on big runs, old single-version
+        packages fell to high risk. In the agent hook, that meant a block the agent had to explain to you.</li>
     </ul>
   </section>
 

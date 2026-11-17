@@ -8,7 +8,7 @@ import { createInterface } from 'readline'
 import path from 'path'
 import { scan } from './scan'
 import { loadConfig } from './config'
-import { verifyPackages, describeVerdict } from './verify'
+import { verifyPackages, describeVerdict, describeUnclaimable } from './verify'
 import { extractCommandTargets } from './commands'
 import type { PackageVerdict } from './types'
 
@@ -156,8 +156,10 @@ function buildTools(): ToolDefinition[] {
           lines.push('\nEvery imported and declared package exists on npm.')
         } else {
           lines.push(`\n${results.missing.length} package(s) DO NOT EXIST on npm:`)
-          for (const { pkg, files, claimable } of results.missing) {
-            const owned = claimable === false ? ` — ${pkg.split('/')[0]} scope is owned, not squattable` : ''
+          for (const { pkg, files, claimable, unclaimableReason, similarTo } of results.missing) {
+            const owned = claimable === false
+              ? ` — not squattable: ${describeUnclaimable(pkg, { reason: unclaimableReason ?? 'scope', similarTo })}`
+              : ''
             lines.push(`  - ${pkg}  (${files.slice(0, 5).join(', ')}${files.length > 5 ? `, +${files.length - 5} more` : ''})${owned}`)
           }
           lines.push('These will fail to install. Names marked [SQUATTABLE] below are also free for an attacker to register. Fix them.')

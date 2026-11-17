@@ -1,12 +1,38 @@
 import { loadCache, saveCache, getCached } from './cache'
-import { checkNpm, checkPackageRisk, checkScope, detectTyposquat } from './npm'
-import type { CacheEntry, NpmCheckResult, PackageVerdict, VerifyOptions } from './types'
+import { checkNpm, checkPackageRisk, checkScope, detectTyposquat, punctuationVariants } from './npm'
+import type { CacheEntry, Claim, NpmCheckResult, PackageVerdict, VerifyOptions } from './types'
 
 const CONCURRENCY = 10
 
 /**
- * Which of these missing names could a stranger publish? An unscoped name always;
- * a scoped one only if nobody owns the scope. `null` when the scope could not be checked.
+ * Does each name exist on npm? Through the registry cache; `null` when unreachable.
+ * Mutates `cache`; the caller saves it.
+ */
+async function existsMany(
+  names: string[],
+  cache: Record<string, CacheEntry>,
+  useCache: boolean,
+): Promise<Map<string, boolean | null>> {
+  const unique = [...new Set(names)]
+  const result = new Map<string, boolean | null>()
+  for (let i = 0; i < unique.length; i += CONCURRENCY) {
+    const batch = unique.slice(i, i + CONCURRENCY)
+    const answers = await Promise.all(batch.map(async (name) => {
+      const cached = getCached(cache, name)
+      if (cached) return cached.exists
+      const { exists } = await checkNpm(name)
+      if (exists !== null && useCache) cache[name] = { exists, ts: Date.now() }
+      return exists
+    }))
+    batch.forEach((name, j) => result.set(name, answers[j]))
+  }
+  return result
+}
+
+/**
+ * Which of these missing names could a stranger publish? Not a name with capital
+ * letters, one in a scope someone owns, or one npm would refuse as a punctuation
+ * variant of an existing package. `claimable: null` when the scope could not be checked.
  *
  * Scope answers share the registry cache under the bare `@scope` key — never a valid
  * package name, so it cannot collide — with `exists` meaning the scope is owned.
@@ -16,7 +42,7 @@ export async function checkClaimable(
   pkgs: string[],
   cache: Record<string, CacheEntry>,
   useCache: boolean,
-): Promise<Map<string, boolean | null>> {
+): Promise<Map<string, Claim>> {
   const scopes = [...new Set(pkgs.filter(p => p.startsWith('@')).map(p => p.split('/')[0]))]
   const owned = new Map<string, boolean | null>()
 
@@ -32,21 +58,87 @@ export async function checkClaimable(
     batch.forEach((scope, j) => owned.set(scope, answers[j]))
   }
 
-  const claimable = new Map<string, boolean | null>()
+  const claims = new Map<string, Claim>()
   for (const pkg of pkgs) {
     // npm rejects new names with capital letters, so nobody can take `Install` or `@AIRoute/x`
     if (pkg !== pkg.toLowerCase()) {
-      claimable.set(pkg, false)
+      claims.set(pkg, { claimable: false, reason: 'case' })
       continue
     }
     if (!pkg.startsWith('@')) {
-      claimable.set(pkg, true)
+      claims.set(pkg, { claimable: true })
       continue
     }
     const isOwned = owned.get(pkg.split('/')[0]) ?? null
-    claimable.set(pkg, isOwned === null ? null : !isOwned)
+    claims.set(pkg, isOwned === null ? { claimable: null }
+      : isOwned ? { claimable: false, reason: 'scope' }
+      : { claimable: true })
   }
-  return claimable
+
+  // An unscoped name npm would refuse because an existing package differs from it only
+  // in punctuation (`opencode` vs `open-code`). All variants go out in one pool.
+  const variantsOf = new Map<string, string[]>()
+  for (const [pkg, claim] of claims) {
+    if (claim.claimable !== true || pkg.startsWith('@')) continue
+    const variants = punctuationVariants(pkg)
+    if (variants.length > 0) variantsOf.set(pkg, variants)
+  }
+  if (variantsOf.size > 0) {
+    const exists = await existsMany([...variantsOf.values()].flat(), cache, useCache)
+    for (const [pkg, variants] of variantsOf) {
+      const similarTo = variants.find(v => exists.get(v) === true)
+      if (similarTo) claims.set(pkg, { claimable: false, reason: 'similar', similarTo })
+    }
+  }
+  return claims
+}
+
+/** Why nobody can claim a missing name, as a sentence. Empty when the name is claimable. */
+export function describeUnclaimable(pkg: string, claim: Pick<Claim, 'reason' | 'similarTo'>): string {
+  switch (claim.reason) {
+    case 'scope':
+      return `The ${pkg.split('/')[0]} scope already has an owner, so only they could publish it.`
+    case 'case':
+      return 'npm does not accept new names with capital letters, so nobody can register it.'
+    case 'similar':
+      return `npm will not accept it because '${claim.similarTo}' already exists and differs only in punctuation, so nobody can register it.`
+    default:
+      return ''
+  }
+}
+
+/** The DefinitelyTyped package for a module: `@types/estree`, `@types/babel__core`. */
+export function typesPackageFor(pkg: string): string {
+  return pkg.startsWith('@') ? `@types/${pkg.slice(1).replace('/', '__')}` : `@types/${pkg}`
+}
+
+/**
+ * Of these missing names, the ones TypeScript resolves through an `@types/*` package,
+ * so they were never meant to come from npm under their own name: `estree` exists only
+ * as `@types/estree`.
+ *
+ * A name counts when the project declares its `@types` package, or when it is imported
+ * only for types (`import type`, a `.d.ts` file) and the `@types` package exists. Pass
+ * only names that came from code — a missing name in package.json is fetched by
+ * `npm install` regardless. Mutates `cache`; the caller saves it.
+ */
+export async function providedByTypes(
+  missing: string[],
+  { declared, typeOnly }: { declared: ReadonlySet<string>; typeOnly: (pkg: string) => boolean },
+  cache: Record<string, CacheEntry>,
+  useCache: boolean,
+): Promise<Set<string>> {
+  const provided = new Set<string>()
+  const lookup: string[] = []
+  for (const pkg of missing) {
+    if (declared.has(typesPackageFor(pkg))) provided.add(pkg)
+    else if (typeOnly(pkg)) lookup.push(pkg)
+  }
+  if (lookup.length > 0) {
+    const exists = await existsMany(lookup.map(typesPackageFor), cache, useCache)
+    for (const pkg of lookup) if (exists.get(typesPackageFor(pkg)) === true) provided.add(pkg)
+  }
+  return provided
 }
 
 /**
@@ -95,12 +187,12 @@ export async function verifyPackages(
     }
   }
 
-  // A missing name is only squattable if nobody owns its scope
+  // A missing name is only squattable if npm would let a stranger publish it
   const missing = verdicts.filter(v => v.status === 'missing')
   if (missing.length > 0) {
-    const claimable = await checkClaimable(missing.map(v => v.pkg), cache, useCache)
-    for (const v of missing) v.claimable = claimable.get(v.pkg) ?? null
-    if (missing.some(v => v.pkg.startsWith('@'))) cacheDirty = true
+    const claims = await checkClaimable(missing.map(v => v.pkg), cache, useCache)
+    for (const v of missing) applyClaim(v, claims.get(v.pkg))
+    cacheDirty = true
   }
 
   if (useCache && cacheDirty) {
@@ -132,6 +224,16 @@ export async function verifyPackages(
   return verdicts
 }
 
+/** Copy a claim onto a missing verdict or `MissingRef`. */
+export function applyClaim(
+  target: { claimable?: boolean | null; unclaimableReason?: Claim['reason']; similarTo?: string },
+  claim: Claim | undefined,
+): void {
+  target.claimable = claim?.claimable ?? null
+  if (claim?.reason) target.unclaimableReason = claim.reason
+  if (claim?.similarTo) target.similarTo = claim.similarTo
+}
+
 /** True if anything in the list warrants blocking. `unknown` never blocks. */
 export function hasBlockingVerdict(verdicts: PackageVerdict[]): boolean {
   return verdicts.some(v => v.status === 'missing' || (v.status === 'suspicious' && v.risk === 'high'))
@@ -145,8 +247,8 @@ export function describeVerdict(v: PackageVerdict): string {
         ? ` It is 1-2 characters from '${v.typosquatOf}', which is a classic typosquat pattern — you may have meant '${v.typosquatOf}'.`
         : ''
       if (v.claimable === false) {
-        const scope = v.pkg.split('/')[0]
-        return `'${v.pkg}' DOES NOT EXIST on npm.${squat} The ${scope} scope already has an owner, so only they could publish it — the import is broken, but nobody else can claim the name.`
+        const why = describeUnclaimable(v.pkg, { reason: v.unclaimableReason ?? 'scope', similarTo: v.similarTo })
+        return `'${v.pkg}' DOES NOT EXIST on npm.${squat} ${why} It cannot be installed, but nobody else can claim the name either.`
       }
       return `'${v.pkg}' DOES NOT EXIST on npm.${squat} The name is unregistered, so installing it could hand an attacker code execution the moment they claim it.`
     }

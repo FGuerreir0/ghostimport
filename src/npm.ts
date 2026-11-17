@@ -107,6 +107,44 @@ export function detectTyposquat(pkgName: string): string | null {
   return null
 }
 
+// npm compares new unscoped names with punctuation removed: `react_dom` and `reactdom`
+// are refused because `react-dom` exists. These are the separators it ignores.
+const SEPARATORS = /[-._]+/
+const MAX_VARIANT_LENGTH = 32
+
+/**
+ * Existing-package spellings that would make npm refuse to publish this name.
+ *
+ * npm rejects a new unscoped name that matches an existing one once `.`, `-` and `_`
+ * are removed. There is no public endpoint for that check, and the search API does not
+ * find these matches (`opencode` doesn't return `open-code`), so this lists the likely
+ * spellings to look up directly: the same words joined with each separator, or, for a
+ * name with no separators, one hyphen at each position. Two or more inserted
+ * separators (`eslintconfigprettier`) are not tried, so a name can still look
+ * claimable when it isn't.
+ */
+export function punctuationVariants(pkgName: string): string[] {
+  if (pkgName.startsWith('@') || pkgName !== pkgName.toLowerCase()) return []
+  const words = pkgName.split(SEPARATORS).filter(Boolean)
+  const joined = words.join('')
+  if (joined.length < 2 || joined.length > MAX_VARIANT_LENGTH) return []
+
+  const variants = new Set<string>()
+  if (words.length > 1) {
+    for (const sep of ['-', '.', '_', '']) variants.add(words.join(sep))
+  } else {
+    for (let i = 1; i < joined.length; i++) variants.add(`${joined.slice(0, i)}-${joined.slice(i)}`)
+    // `socketio` vs `socket.io`, `chartjs` vs `chart.js`
+    for (const suffix of ['js', 'io']) {
+      if (joined.length > suffix.length + 1 && joined.endsWith(suffix)) {
+        variants.add(`${joined.slice(0, -suffix.length)}.${suffix}`)
+      }
+    }
+  }
+  variants.delete(pkgName)
+  return [...variants]
+}
+
 export function checkNpm(pkgName: string): Promise<NpmCheckResult> {
   return new Promise((resolve) => {
     const options = {
@@ -221,6 +259,7 @@ export interface RiskScore {
  * - Critical: a typosquat (a near name on a package that is not established), or an
  *   install script on a package with any trust deficit.
  * - `high` on any critical signal or 2+ deficits; `medium` on one; else `low`.
+ * - Unknown downloads (`null`) never decide between `medium` and `high`.
  *
  * An install script alone is not a risk: esbuild, puppeteer and core-js all ship one.
  * It is how a malicious package runs, so it turns a package with no track record from
@@ -250,12 +289,40 @@ export function scoreRisk(s: RiskSignals): RiskScore {
   // maintainer and 30M+ weekly downloads. It does not outweigh being brand new, or an
   // install script on a single version.
   const thinHistoryOnly = established && s.ageDays >= 30 && s.installScripts.length === 0
-  const risk: RiskScore['risk'] =
+  let risk: RiskScore['risk'] =
     thinHistoryOnly ? 'low' :
     critical || deficits.length >= 2 ? 'high' :
     deficits.length === 1 ? 'medium' : 'low'
 
+  // When the downloads API doesn't answer, adoption is unknown, not zero. If the
+  // package would not be high risk with real adoption behind it, missing data must
+  // not be what blocks it: the hook fails open on network trouble everywhere else.
+  if (risk === 'high' && s.downloads === null &&
+      scoreRisk({ ...s, downloads: ESTABLISHED_WEEKLY_DOWNLOADS }).risk !== 'high') {
+    risk = 'medium'
+    flags.push('weekly downloads unavailable')
+  }
+
   return { risk, flags, typosquatOf }
+}
+
+/**
+ * Last-week downloads, or `null` when the downloads API doesn't answer. A timeout or
+ * server error gets one retry. A 429 does not: the rate limit outlasts any wait the
+ * hook can afford, and `scoreRisk` already keeps a missing count from blocking.
+ */
+async function fetchWeeklyDownloads(encoded: string): Promise<number | null> {
+  const url = `https://api.npmjs.org/downloads/point/last-week/${encoded}`
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const dl = await httpGetJson(url) as NpmDownloads | null
+      return dl?.downloads ?? null
+    } catch (err) {
+      if ((err as Error).message === 'HTTP 429') return null
+      if (attempt === 0) await new Promise(r => setTimeout(r, 500))
+    }
+  }
+  return null
 }
 
 /** Full supply-chain check for one package: registry metadata plus risk heuristics. */
@@ -270,11 +337,7 @@ export async function checkPackageRisk(pkgName: string): Promise<PackageRiskResu
     const ageMs = created ? Date.now() - created.getTime() : Infinity
     const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24))
 
-    let downloads: number | null = null
-    try {
-      const dl = await httpGetJson(`https://api.npmjs.org/downloads/point/last-week/${encoded}`) as NpmDownloads | null
-      downloads = dl?.downloads ?? null
-    } catch { /* ignore */ }
+    const downloads = await fetchWeeklyDownloads(encoded)
 
     const latestVersion = meta['dist-tags']?.latest
     const latestMeta = latestVersion ? meta.versions?.[latestVersion] : undefined

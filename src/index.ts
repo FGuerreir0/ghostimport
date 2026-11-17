@@ -38,6 +38,7 @@ export type {
   PackageRef,
   PackageError,
   MissingRef,
+  UnclaimableReason,
   RiskEntry,
   NpmCheckResult,
   PackageRiskResult,
